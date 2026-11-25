@@ -22,7 +22,8 @@ jobs:
 
       - name: Install Midnight Compact Compiler
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
+          set -euo pipefail
+          curl --proto '=https' --tlsv1.2 --retry 5 --retry-all-errors --retry-delay 3 -LsSf https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Verify Compact Version & Compile LeaseProof Contract
