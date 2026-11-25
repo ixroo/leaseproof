@@ -41,24 +41,25 @@ export default function LandingPage() {
         {/* Clean Editorial Hero */}
         <section className="hero-section">
           <div className="container">
-            <div style={{ maxWidth: 820 }}>
+            <div style={{ maxWidth: 840 }}>
               <span className="badge badge-violet reveal reveal-1" style={{ marginBottom: 18 }}>
-                Midnight Network · Compact Dual-Ledger Selective Disclosure
+                Midnight Network · Privacy-First Rental Pre-Qualification &amp; Viewing Pass
               </span>
               <h1 className="display-xl reveal reveal-2">
-                Prove you qualify to rent—without handing landlords your bank statements, payslips,
-                or ID.
+                Pre-qualify for apartment viewings—without spraying your bank statements, payslips,
+                or ID to 20 brokers.
               </h1>
               <p className="lead reveal reveal-3">
-                LeaseProof turns Open Banking &amp; Payroll attestations into zero-knowledge
-                Qualification Passes on Midnight. Landlords get tamper-proof cryptographic certainty
-                in 3 seconds; tenants keep 100% of their salary, balance, and identity private—and
-                can revoke any pass with one click.
+                LeaseProof turns issuer-anchored Open Banking &amp; Payroll attestations into
+                listing-bound, revocable zero-knowledge Viewing Passes on Midnight. Brokers verify
+                affordability off-chain in 3 seconds with zero wallet; tenants disclose zero raw
+                salary or balance—and only share legal ID with the single landlord they actually sign
+                with.
               </p>
 
               <div className="reveal reveal-4" style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                 <Link href="/app" className="btn-primary">
-                  Launch Interactive ZK Workspace <ArrowUpRight size={16} />
+                  Launch Interactive ZK Sandbox <ArrowUpRight size={16} />
                 </Link>
                 <Link href="/app?tab=attacks" className="btn-ghost">
                   Test 8 Adversarial Attacks
@@ -101,36 +102,36 @@ export default function LandingPage() {
                   Art. 5(1)(c)
                 </strong>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
-                  Landlords store zero sensitive PDFs or ID scans
+                  Brokers store zero sensitive PDFs during pre-qualification
                 </div>
               </div>
               <div className="card" style={{ borderColor: "rgba(16, 185, 129, 0.35)" }}>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>
-                  Private Data Exposed On-Chain
+                  On-Chain Privacy Model
                 </div>
-                <strong className="tabular" style={{ fontSize: 30, color: "var(--green)" }}>
-                  0 Bits
+                <strong className="tabular" style={{ fontSize: 28, color: "var(--green)" }}>
+                  Threshold-Only
                 </strong>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
-                  Salary, balance &amp; secret stay in local Compact witnesses
+                  Zero raw salary, balance, or bank PDFs disclosed on-chain
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* 3 Real-World Templates Powered by One Compact Contract */}
+        {/* 1 Flexible Compact Contract · 2 Modes · 3 Rental Verticals */}
         <section style={{ padding: "56px 0", borderBottom: "1px solid var(--border)" }}>
           <div className="container">
             <div style={{ marginBottom: 24 }}>
               <span className="badge badge-cyan" style={{ marginBottom: 10 }}>
-                One Compact Contract · Three High-Frequency Templates
+                1 Flexible Contract · 2 Circuit Modes · 3 Rental Verticals
               </span>
-              <h2 className="display-md">Built for Real Everyday Qualification Checks</h2>
+              <h2 className="display-md">Built for Real Everyday Pre-Qualification Checks</h2>
               <p className="prose" style={{ margin: 0, fontSize: 15, color: "var(--muted)", lineHeight: 1.6 }}>
-                Whether you earn a corporate salary or freelance across borders, LeaseProof verifies
-                exact thresholds privately inside Midnight Compact circuits—without exposing raw
-                financial history.
+                A single parameterized Midnight Compact contract enforces ISO-4217 currency parity,
+                issuer-anchored attestations, and listing-bound passes across salaried rentals,
+                freelancer runway checks, and vehicle leases.
               </p>
             </div>
 
@@ -138,12 +139,12 @@ export default function LandingPage() {
               <div className="card">
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                   <Building2 size={20} color="#7c5cff" style={{ flexShrink: 0 }} />
-                  <strong style={{ fontSize: 17 }}>Apartment &amp; House Lease</strong>
+                  <strong style={{ fontSize: 17 }}>Apartment &amp; House Viewing</strong>
                 </div>
                 <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--muted)", lineHeight: 1.55 }}>
                   Proves <strong style={{ color: "var(--text)" }}>monthly income ≥ 3× rent</strong>{" "}
                   and <strong style={{ color: "var(--text)" }}>liquid deposit ≥ 2× rent</strong>{" "}
-                  from a verified payroll or open-banking attester.
+                  from an issuer-anchored payroll or open-banking attestation.
                 </p>
                 <span className="badge badge-neutral mono">mode = 0 (Income + Deposit)</span>
               </div>
@@ -156,7 +157,7 @@ export default function LandingPage() {
                 <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--muted)", lineHeight: 1.55 }}>
                   Designed for remote workers, founders &amp; nomads without a W-2 payslip: proves{" "}
                   <strong style={{ color: "var(--text)" }}>liquid savings ≥ 6× monthly rent</strong>{" "}
-                  privately.
+                  in matching ISO-4217 currency.
                 </p>
                 <span className="badge badge-cyan mono">mode = 1 (Liquid Runway Only)</span>
               </div>
@@ -167,8 +168,8 @@ export default function LandingPage() {
                   <strong style={{ fontSize: 17 }}>Vehicle &amp; Equipment Lease</strong>
                 </div>
                 <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--muted)", lineHeight: 1.55 }}>
-                  Instant qualification for EV subscriptions, car leases, and B2B equipment rentals
-                  with listing-scoped anti-replay protection.
+                  Instant pre-qualification for EV subscriptions, car leases, and B2B equipment
+                  rentals with anti-forward listing binding and KYC identity commitment.
                 </p>
                 <span className="badge badge-neutral mono">mode = 0 (4× Lease + 3× Deposit)</span>
               </div>
@@ -181,36 +182,39 @@ export default function LandingPage() {
           <div className="container">
             <div style={{ marginBottom: 24 }}>
               <span className="badge badge-violet" style={{ marginBottom: 10 }}>
-                Midnight Dual-Ledger Guarantee
+                Hardened Midnight Dual-Ledger Guarantee
               </span>
-              <h2 className="display-md">What Landlords See vs. What Stays Private Forever</h2>
+              <h2 className="display-md">What Brokers Verify vs. What Stays Private Forever</h2>
             </div>
 
             <div className="grid-2">
               <div className="card" style={{ borderColor: "rgba(16, 185, 129, 0.35)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                   <CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0 }} />
-                  <strong style={{ fontSize: 16 }}>Anyone Can Verify (Public Midnight Ledger)</strong>
+                  <strong style={{ fontSize: 16 }}>Public Midnight Ledger (Off-Chain Readable)</strong>
                 </div>
                 <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 10, fontSize: 14, color: "var(--muted)" }}>
                   <li>
-                    <strong style={{ color: "var(--text)" }}>Binary Verdict:</strong>{" "}
-                    <span className="mono" style={{ color: "var(--green)" }}>QUALIFIED (1)</span> or{" "}
-                    <span className="mono" style={{ color: "var(--red)" }}>REVOKED (2)</span>
+                    <strong style={{ color: "var(--text)" }}>Listing-Bound Verdict:</strong>{" "}
+                    <span className="mono" style={{ color: "var(--green)" }}>QUALIFIED (1)</span>,{" "}
+                    <span className="mono" style={{ color: "var(--red)" }}>REVOKED (2)</span>, or{" "}
+                    <span className="mono" style={{ color: "var(--amber)" }}>EXPIRED (3)</span>—rejects
+                    cross-listing forwarding (<span className="mono">LISTING_MISMATCH</span>)
                   </li>
                   <li>
-                    <strong style={{ color: "var(--text)" }}>Trusted Attester ID:</strong> e.g. Plaid
-                    Open Banking / Tink EU / Argyle Payroll
+                    <strong style={{ color: "var(--text)" }}>Issuer-Anchored Attestation:</strong>{" "}
+                    Signed &amp; anchored on-ledger by Plaid / Tink / Argyle via{" "}
+                    <span className="mono">anchorAttestation()</span>
                   </li>
                   <li>
-                    <strong style={{ color: "var(--text)" }}>Listing-Scoped Nullifier:</strong>{" "}
-                    Blocks duplicate replay on the same listing while keeping multi-listing
-                    applications unlinkable
+                    <strong style={{ color: "var(--text)" }}>Anti-Straw-Applicant Binding:</strong>{" "}
+                    Pseudonymous <span className="mono">applicantIdCommit</span> stops borrowing a
+                    wealthy friend&apos;s account
                   </li>
                   <li>
-                    <strong style={{ color: "var(--text)" }}>Pass Expiry &amp; Revocation:</strong>{" "}
-                    Auto-expires in 14 days or revoked instantly by tenant via{" "}
-                    <span className="mono">revokeReceipt()</span>
+                    <strong style={{ color: "var(--text)" }}>14-Day Expiry &amp; Instant Revocation:</strong>{" "}
+                    Contract-enforced monotonic epoch + 1-click{" "}
+                    <span className="mono">revokeReceipt()</span> with next-window re-apply
                   </li>
                 </ul>
               </div>
@@ -218,24 +222,24 @@ export default function LandingPage() {
               <div className="card" style={{ borderColor: "rgba(124, 92, 255, 0.35)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                   <EyeOff size={18} color="#7c5cff" style={{ flexShrink: 0 }} />
-                  <strong style={{ fontSize: 16 }}>Nobody Can Ever See (Local Private Witness)</strong>
+                  <strong style={{ fontSize: 16 }}>Local Private Witness (Never Leaves Device)</strong>
                 </div>
                 <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 10, fontSize: 14, color: "var(--muted)" }}>
                   <li>
-                    <strong style={{ color: "var(--text)" }}>Exact Monthly Salary:</strong> Whether
-                    you earn $7,200 or $42,000/mo is never revealed
+                    <strong style={{ color: "var(--text)" }}>Exact Monthly Salary:</strong> Threshold-only
+                    proof confirms you meet the rent bar without exposing exact earnings
                   </li>
                   <li>
                     <strong style={{ color: "var(--text)" }}>Total Bank Balance &amp; Transactions:</strong>{" "}
-                    Zero bank statements, zero spending history
+                    Zero bank statements, zero spending history uploaded to brokers
                   </li>
                   <li>
-                    <strong style={{ color: "var(--text)" }}>Identity &amp; Employer Name:</strong>{" "}
-                    Tenant secret stays on-device; zero cross-landlord tracking
+                    <strong style={{ color: "var(--text)" }}>Raw Identity &amp; Employer Name:</strong>{" "}
+                    Legal ID is only presented once at final lease signing, never during 20 viewings
                   </li>
                   <li>
-                    <strong style={{ color: "var(--text)" }}>Attestation Nonce &amp; Salt:</strong>{" "}
-                    Prevents brute-force commitment guessing
+                    <strong style={{ color: "var(--text)" }}>Attestation Nonce &amp; Tenant Secret:</strong>{" "}
+                    Blinds commitments against brute-force guessing while proving revoke ownership
                   </li>
                 </ul>
               </div>
@@ -243,27 +247,27 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Business Model & Adoption Path */}
+        {/* Realistic Unit Economics & Adoption Path */}
         <section style={{ padding: "56px 0" }}>
           <div className="container">
             <div style={{ marginBottom: 24 }}>
               <span className="badge badge-neutral" style={{ marginBottom: 10 }}>
-                Sustainable B2B2C Business Model
+                Incentive-Aligned Unit Economics
               </span>
-              <h2 className="display-md">Free for Renters. Paid by Landlords Who Save 10× on Screening.</h2>
+              <h2 className="display-md">One Reusable Tenant Pass Replaces $35–$50 Per-Listing Fees.</h2>
             </div>
 
             <div className="grid-3">
               <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 16 }}>
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <span className="badge badge-ok">Tenants</span>
-                    <strong className="tabular" style={{ fontSize: 18 }}>$0 / Free</strong>
+                    <span className="badge badge-ok">First Pass / Sandbox</span>
+                    <strong className="tabular" style={{ fontSize: 18 }}>$0 Free</strong>
                   </div>
-                  <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Private Qualification Pass</h3>
+                  <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Try Private Pre-Qualification</h3>
                   <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)", lineHeight: 1.55 }}>
-                    Generate unlimited listing-scoped ZK passes, share walletless verification links,
-                    and revoke landlord access anytime with one click.
+                    Zero friction for landlords (walletless off-chain verifier is always $0) and
+                    free first pass for tenants testing private viewing qualification.
                   </p>
                 </div>
                 <Link href="/app" className="btn-ghost" style={{ width: "fit-content" }}>
@@ -274,30 +278,31 @@ export default function LandingPage() {
               <div className="card" style={{ borderColor: "rgba(124, 92, 255, 0.45)", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 16 }}>
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <span className="badge badge-violet">Landlords &amp; Agencies</span>
-                    <strong className="tabular" style={{ fontSize: 18, color: "#c4b5fd" }}>$2 / Pass</strong>
+                    <span className="badge badge-violet">Active Renters</span>
+                    <strong className="tabular" style={{ fontSize: 18, color: "#c4b5fd" }}>$1.99 / 30d</strong>
                   </div>
-                  <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Anti-Fraud Instant Verifier</h3>
+                  <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Reusable Multi-Listing Pass</h3>
                   <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)", lineHeight: 1.55 }}>
-                    Replaces $15–$50 manual PDF screening with instant cryptographic verification
-                    that stops Photoshopped pay stubs and removes GDPR data-breach liability.
+                    Covers Plaid/Tink Open Banking attestation cost once, then lets renters mint
+                    unlimited listing-bound Viewing Passes across 20+ apartments instead of paying
+                    $35–$50 per application.
                   </p>
                 </div>
                 <Link href="/app?tab=landlord" className="btn-primary" style={{ width: "fit-content" }}>
-                  Try as Landlord <ArrowUpRight size={14} />
+                  Try Walletless Verifier <ArrowUpRight size={14} />
                 </Link>
               </div>
 
               <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 16 }}>
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <span className="badge badge-cyan">Rental Platforms</span>
-                    <strong className="tabular" style={{ fontSize: 18 }}>Enterprise API</strong>
+                    <span className="badge badge-cyan">Property Portals</span>
+                    <strong className="tabular" style={{ fontSize: 18 }}>B2B Portal API</strong>
                   </div>
-                  <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Embedded ZK Verification SDK</h3>
+                  <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Embedded Pre-Qual Badge</h3>
                   <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)", lineHeight: 1.55 }}>
-                    Drop-in Midnight verification widget for property portals, co-living networks,
-                    and mobility subscription platforms with custom attester allowlists.
+                    White-label Midnight verification SDK for Zillow/StreetEasy-style portals and
+                    co-living marketplaces—subsidizing Open Banking calls to eliminate broker spam.
                   </p>
                 </div>
                 <Link href="/deck" className="btn-ghost" style={{ width: "fit-content" }}>
@@ -323,7 +328,7 @@ export default function LandingPage() {
                 <Lock size={13} color="#7c5cff" /> LeaseProof · Apache-2.0 Open Source · AKINDO × Midnight Wave 3
               </span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <FileWarning size={13} color="#22d3ee" /> Compact Smart Contract Compiled on Ubuntu Linux CI · Interactive Browser Mirror
+                <FileWarning size={13} color="#22d3ee" /> Compact Contract Compiled on Ubuntu Linux CI · Transparent Browser Sandbox
               </span>
             </footer>
           </div>

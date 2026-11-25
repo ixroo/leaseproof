@@ -1,53 +1,58 @@
-# LeaseProof — Privacy-First Rental & Lease Qualification on Midnight
+# LeaseProof — Privacy-First Rental Pre-Qualification & Viewing Pass on Midnight
 
-> **"Prove you qualify to rent—without handing landlords your bank statements, payslips, or ID."**
+> **"Pre-qualify for apartment viewings—without spraying your bank statements, payslips, or ID to 20 brokers."**
 
 Built for **AKINDO × Midnight "Build Privacy-First Apps on Midnight" (3rd Wave)**.  
 Licensed under **Apache License 2.0**.
 
 ---
 
-## Why LeaseProof? (Real-World Market Pain)
+## Why LeaseProof? (Real-World Market Pain & Honest Scope)
 
 - **93.3%** of US rental housing providers experienced application fraud in the past 12 months (*NMHC Pulse Survey*).
 - **84.3%** of that fraud involves **falsified pay stubs or doctored bank statements**, with up to **1 in 8** rental applications containing fraudulent income PDFs (*Snappt*).
-- Meanwhile, honest renters (salaried employees, freelancers, remote workers, expats) are forced to send raw bank statements, payslips, and ID photos over email/WhatsApp—violating **EU GDPR Article 5(1)(c) (Data Minimization)** and creating massive data-breach liability for property agencies.
+- Meanwhile, honest renters (salaried employees, freelancers, remote workers, expats) are forced to spray raw bank statements, payslips, and ID scans over email/WhatsApp to 15–20 brokers just to book apartment viewings—violating **EU GDPR Article 5(1)(c) (Data Minimization)** and creating massive breach liability for agencies.
 
-**LeaseProof** sits on top of existing Open Banking & Payroll attesters (Plaid, Tink, Argyle, Finch) and uses **Midnight Compact zero-knowledge smart contracts** so:
-- **Tenants** prove affordability (`income >= 3x rent & deposit`, or `6-month liquid runway` with `$0` payslip) while keeping **100% of salary, balance, and identity private (`0 bits leaked`)**—and can **revoke** any landlord's pass in 1 click.
-- **Landlords** verify qualification **wallet-free in < 3 seconds**, eliminating Photoshopped PDFs and GDPR PDF storage liability.
+**LeaseProof** targets the high-leakage **Pre-Qualification & Viewing stage** (final lease signing still uses standard legal ID & eviction checks). Sits on top of existing Open Banking & Payroll attesters (Plaid, Tink, Argyle, Finch) using **Midnight Compact zero-knowledge smart contracts**:
+- **Tenants** prove affordability (`income >= 3x rent & deposit`, or `6-month liquid runway` with `$0` payslip) via **threshold-only proofs** (zero raw salary, balance, or bank PDFs disclosed)—and can **revoke** any pass in 1 click.
+- **Landlords & Brokers** verify qualification **wallet-free off-chain in < 3 seconds** by reading the public Midnight ledger, blocking Photoshopped PDFs, cross-listing forwarding, and straw applicants.
 
 ---
 
-## Midnight Dual-Ledger Architecture (`contracts/leaseproof.compact`)
+## Hardened Midnight Dual-Ledger Architecture (`contracts/leaseproof.compact`)
 
 | Layer | Data Stored / Processed | Visibility |
 | :--- | :--- | :--- |
-| **Private Witnesses (Local)** | `tenantSecret`, `monthlyIncomeUsd`, `liquidBalanceUsd`, `attestationNonce`, `attestedCommitment` | **100% Private (Never leaves device)** |
-| **Public Midnight Ledger** | `trustedIssuers`, `listingMode`, `listingMinIncome`, `listingMinBalance`, `usedNullifiers`, `verifiedReceipts` (`QUALIFIED` / `REVOKED`), `receiptOwnerCommit`, `receiptExpiry` | **Publicly Verifiable (0 bits of salary/balance)** |
+| **Private Witnesses (Local)** | `tenantSecret`, `issuerSecret`, `adminSecret`, `monthlyIncome`, `liquidBalance`, `currencyCode`, `attestationNonce`, `applicantIdCommit` | **100% Private (Never leaves device)** |
+| **Public Midnight Ledger** | `registryAdminCommit`, `currentLedgerEpoch`, `trustedIssuers`, `issuerKeyCommits`, `anchoredAttestations`, `listingMode`, `listingCurrency`, `listingMinIncome`, `listingMinBalance`, `usedNullifiers`, `verifiedReceipts`, `receiptListingId`, `receiptExpiry`, `receiptOwnerCommit`, `receiptApplicantId` | **Publicly Verifiable (Off-chain readable, zero raw financials)** |
 
-### 7 Exported Compact Circuits
-1. `registerIssuer(issuerId)` — Registers trusted Open Banking / Payroll attester on public ledger.
-2. `revokeIssuer(issuerId)` — Immediately blocks new proofs from a compromised attester.
-3. `createListing(listingId, mode, minIncomeUsd, minBalanceUsd)` — Supports `mode = 0` (Apartment/Vehicle Income + Deposit) and `mode = 1` (Freelancer 6-Month Liquid Runway).
-4. `submitQualificationProof(listingId, currentEpoch, passExpiryEpoch)` — Enforces all 6 ZK invariants in-circuit and discloses only `(listingNullifier, receiptId, QUALIFIED)`.
-5. `revokeReceipt(receiptId)` — Proves caller owns `tenantSecret()` matching `receiptOwnerCommit`, flipping pass to `REVOKED (2)`.
-6. `verifyReceipt(receiptId)` — Walletless public status check (`0 = NOT_FOUND`, `1 = QUALIFIED`, `2 = REVOKED`).
-7. Pure derivation helpers: `deriveOwnerCommit`, `deriveListingNullifier`, `deriveReceiptId`.
+### 6 Hardened State-Changing Compact Circuits (Read-Only Verification Happens Off-Chain)
+1. `registerIssuer(issuerId, issuerKeyCommit)` — **Admin-gated** via `registryAdminCommit`; registers a trusted Open Banking / Payroll attester and binds its signing key commitment.
+2. `revokeIssuer(issuerId)` — **Admin-gated**; immediately blocks new proofs from a compromised attester.
+3. `advanceEpoch(newEpoch)` — **Admin-gated monotonic ledger clock** (`EPOCH_CANNOT_GO_BACKWARD`) so provers cannot forge `currentEpoch` or extend pass expiry.
+4. `anchorAttestation(issuerId, attestationCommitment, expiresAtEpoch)` — **Issuer-key-authenticated** (`UNAUTHORIZED_ISSUER_KEY`); anchors signed attestations on-ledger so tenants cannot locally edit salary and re-hash to bypass `TAMPERED_COMMITMENT`.
+5. `createListing(listingId, mode, currencyCode, minIncome, minBalance)` — **1 flexible contract, 2 circuit modes, 3 verticals**: `mode = 0` (Apartment/Vehicle Income + Deposit) and `mode = 1` (Freelancer 6-Month Liquid Runway), enforcing **ISO-4217 currency parity** (`CURRENCY_MISMATCH`).
+6. `submitQualificationProof(listingId)` & `revokeReceipt(receiptId)` — Enforces issuer anchoring, active status, monotonic expiry, currency match, threshold check, **attester-bound windowed nullifier** (blocks secret-rotation spam while allowing re-apply after 14-day expiry), **listing-bound receipts** (`LISTING_MISMATCH`), **anti-straw-applicant KYC binding** (`applicantIdCommit`), and **tenant-only revocation**.
+
+> **Transparent Execution Note:** The live web workspace (`/app`) runs an explicit **Simulated Compact Sandbox** (`src/lib/zk/leaseproofEngine.ts`) mirroring every circuit invariant 1:1 for zero-wallet judge evaluation, while the real `contracts/leaseproof.compact` is compiled by the official Midnight `compact` compiler in GitHub Actions Ubuntu Linux CI.
 
 ---
 
-## Automated QA & 8 Adversarial Attack Tests
+## Automated QA & 12 Adversarial Attack Defenses
 
-Run `npm test` to execute **17 Vitest unit & adversarial tests** proving the circuit rejects:
-1. `INSUFFICIENT_INCOME` (salary `$1` below threshold)
-2. `INSUFFICIENT_BALANCE` (freelancer `$1` below 6-month runway)
-3. `UNTRUSTED_ISSUER` (fake Photoshopped bank attester)
-4. `REVOKED_ISSUER` (compromised attester revoked on-chain)
-5. `REPLAY_ATTACK` (duplicate submission to same listing)
-6. `EXPIRED_ATTESTATION` (stale financial statement)
-7. `TAMPERED_COMMITMENT` (tenant edits salary locally after signing)
-8. `UNAUTHORIZED_REVOKE` (stranger/landlord tries to revoke tenant's pass)
+Run `npm test` to execute **17 Vitest unit & adversarial tests** proving the hardened circuit rejects:
+1. `TAMPERED_COMMITMENT` (even if a tenant edits salary locally AND recomputes the commitment hash, it fails `ATTESTATION_NOT_ANCHORED`)
+2. `UNAUTHORIZED_ADMIN` (non-admin attempts to register/revoke an issuer or manipulate ledger epoch)
+3. `UNAUTHORIZED_ISSUER_KEY` (attacker tries to anchor a fake attestation without the issuer's secret)
+4. `LISTING_MISMATCH` (tenant qualifies for a cheap `$500` room and forwards the receipt to a `$5,000` luxury listing)
+5. `CURRENCY_MISMATCH` (EUR/IDR attestation submitted to a USD listing)
+6. `REPLAY_ATTACK` (even if tenant rotates `tenantSecret`, attester-bound windowed nullifier blocks same-window spam, while allowing legitimate re-apply after 14-day expiry)
+7. `EPOCH_CANNOT_GO_BACKWARD` (clock rollback attempt rejected)
+8. `INSUFFICIENT_INCOME` (salary `$1` below threshold)
+9. `INSUFFICIENT_BALANCE` (freelancer `$1` below 6-month runway)
+10. `UNTRUSTED_ISSUER` (unregistered fake bank attester)
+11. `REVOKED_ISSUER` (compromised attester revoked on-chain)
+12. `EXPIRED_ATTESTATION` & `UNAUTHORIZED_REVOKE` (stale attestation & stranger revoke attempt)
 
 ---
 
@@ -57,7 +62,7 @@ Run `npm test` to execute **17 Vitest unit & adversarial tests** proving the cir
 
 ```bash
 npm install
-npm test        # 17 unit & adversarial ZK tests (Vitest)
+npm test        # 17 unit & hardened adversarial ZK tests (Vitest)
 npm run lint    # ESLint (0 warnings)
 npm run build   # Next.js production build
 npm run dev     # Start local dev server

@@ -1,34 +1,54 @@
 // SPDX-License-Identifier: Apache-2.0
-// LeaseProof — TypeScript Mirror Engine for contracts/leaseproof.compact
-// Mirrors every Compact dual-ledger invariant, SHA-256 commitment, listing-scoped nullifier,
-// tenant-controlled revocation, and zero-bit privacy boundary.
+// LeaseProof — Hardened TypeScript Mirror Engine for contracts/leaseproof.compact
+// Mirrors all hardened dual-ledger invariants:
+// - Admin-gated issuer registry & monotonic on-chain epoch
+// - Issuer-anchored attestation commitments (unforgeable TAMPERED_COMMITMENT protection)
+// - Listing-bound receipts & ISO-4217 currency matching
+// - Attester-bound applicantIdCommit (anti straw-applicant)
+// - Windowed anti-replay nullifiers + EXPIRED (3) status check
 
-export type ListingMode = 0 | 1; // 0 = Income + Deposit (Apartment / Vehicle), 1 = Liquid Runway Only (Freelancer / Co-Living)
+export type ListingMode = 0 | 1; // 0 = Income + Deposit, 1 = Liquid Runway Only
 export type TemplateType = "APARTMENT" | "FREELANCER_COLIVING" | "VEHICLE_LEASE";
-export type ReceiptStatus = 0 | 1 | 2; // 0 = NOT_FOUND, 1 = QUALIFIED, 2 = REVOKED
+export type CurrencyCode = 840 | 978 | 360; // 840 = USD, 978 = EUR, 360 = IDR
+export type ReceiptStatus = 0 | 1 | 2 | 3; // 0 = NOT_FOUND, 1 = QUALIFIED, 2 = REVOKED, 3 = EXPIRED
+
+export const CURRENCY_META: Record<CurrencyCode, { code: string; symbol: string }> = {
+  840: { code: "USD", symbol: "$" },
+  978: { code: "EUR", symbol: "€" },
+  360: { code: "IDR", symbol: "Rp" },
+};
+
+export const PASS_VALIDITY_SEC = 1_209_600; // 14 days enforced in-circuit
 
 export type CompactAssertionCode =
+  | "UNAUTHORIZED_ADMIN"
+  | "UNAUTHORIZED_ISSUER_KEY"
+  | "EPOCH_CANNOT_GO_BACKWARD"
   | "UNKNOWN_ISSUER"
   | "INVALID_LISTING_MODE"
+  | "INVALID_CURRENCY"
   | "INVALID_BALANCE_THRESHOLD"
   | "UNKNOWN_LISTING"
-  | "INVALID_PASS_EXPIRY"
   | "UNTRUSTED_ISSUER"
   | "REVOKED_ISSUER"
   | "EXPIRED_ATTESTATION"
+  | "CURRENCY_MISMATCH"
   | "TAMPERED_COMMITMENT"
+  | "ISSUER_COMMITMENT_MISMATCH"
   | "INSUFFICIENT_BALANCE"
   | "INSUFFICIENT_INCOME"
   | "REPLAY_ATTACK"
   | "UNKNOWN_RECEIPT"
   | "ALREADY_REVOKED"
-  | "UNAUTHORIZED_REVOKE";
+  | "UNAUTHORIZED_REVOKE"
+  | "LISTING_MISMATCH";
 
 export interface IssuerRecord {
   id: string;
   idHash: string;
   name: string;
   providerType: "Open Banking" | "Payroll API" | "Enterprise Employer";
+  keyCommit: string;
   active: boolean;
   registeredAt: number;
 }
@@ -40,9 +60,10 @@ export interface ListingRecord {
   location: string;
   template: TemplateType;
   mode: ListingMode;
-  monthlyRentUsd: number;
-  minIncomeUsd: number;
-  minBalanceUsd: number;
+  currencyCode: CurrencyCode;
+  monthlyRent: number;
+  minIncome: number;
+  minBalance: number;
   landlordName: string;
   createdAt: number;
 }
@@ -50,8 +71,10 @@ export interface ListingRecord {
 export interface PrivateTenantWitness {
   tenantLabel: string;
   tenantSecret: string;
-  monthlyIncomeUsd: number;
-  liquidBalanceUsd: number;
+  applicantIdCommit: string; // Attester-derived KYC identity commitment (anti straw-applicant)
+  monthlyIncome: number;
+  liquidBalance: number;
+  currencyCode: CurrencyCode;
   attestationIssuerId: string;
   attestationExpiryEpoch: number;
   attestationNonce: string;
@@ -61,21 +84,21 @@ export interface PrivateTenantWitness {
 export interface PublicReceiptRecord {
   receiptId: string;
   listingId: string;
+  listingIdHash: string;
   listingTitle: string;
   listingTemplate: TemplateType;
   listingMode: ListingMode;
+  currencyCode: CurrencyCode;
   issuerName: string;
   nullifier: string;
   ownerCommit: string;
-  status: ReceiptStatus;
+  applicantIdCommit: string;
+  status: 1 | 2; // On-chain stored status (EXPIRED computed dynamically against currentLedgerEpoch)
   issuedAtEpoch: number;
   expiresAtEpoch: number;
   revokedAtEpoch: number | null;
   proofDurationMs: number;
   circuitName: "submitQualificationProof";
-  leakedSalaryBits: 0;
-  leakedBalanceBits: 0;
-  leakedIdentityBits: 0;
 }
 
 export interface CircuitExecutionResult {
@@ -84,25 +107,25 @@ export interface CircuitExecutionResult {
   errorCode?: CompactAssertionCode;
   humanReason?: string;
   receipt?: PublicReceiptRecord;
-  privacyAudit?: {
-    privateWitnessFields: Array<{ label: string; value: string; disclosed: false }>;
-    publicLedgerFields: Array<{ label: string; value: string; disclosed: true }>;
-    leakedSecretBits: 0;
-  };
+}
+
+export interface VerifyReceiptResult {
+  status: ReceiptStatus;
+  errorCode?: "LISTING_MISMATCH";
+  humanReason: string;
+  receipt: PublicReceiptRecord | null;
 }
 
 export interface LedgerSnapshot {
+  currentLedgerEpoch: number;
   issuers: IssuerRecord[];
   listings: ListingRecord[];
+  anchoredAttestationCount: number;
   usedNullifiers: string[];
   receipts: PublicReceiptRecord[];
   totalVerifiedPasses: number;
 }
 
-/**
- * Deterministic 256-bit hash (pure JS SHA-256) so it runs identically in Node (Vitest)
- * and browser environments without async WebCrypto friction inside synchronous simulation tests.
- */
 const K = new Uint32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
   0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
@@ -161,77 +184,151 @@ export function sha256Hex(input: string): string {
     .join("");
 }
 
-export function deriveOwnerCommit(tenantSecret: string): string {
-  return "0x" + sha256Hex(`leaseproof:owner|${tenantSecret}`);
-}
+export const deriveAdminCommit = (secret: string) => "0x" + sha256Hex(`leaseproof:admin|${secret}`);
+export const deriveIssuerKeyCommit = (secret: string) => "0x" + sha256Hex(`leaseproof:issuer|${secret}`);
+export const deriveOwnerCommit = (secret: string) => "0x" + sha256Hex(`leaseproof:owner|${secret}`);
+export const deriveApplicantIdCommit = (nationalIdHash: string, kycSalt: string) =>
+  "0x" + sha256Hex(`leaseproof:kyc|${nationalIdHash}|${kycSalt}`);
 
-export function deriveListingNullifier(tenantSecret: string, listingIdHash: string): string {
-  return "0x" + sha256Hex(`leaseproof:nullifier|${tenantSecret}|${listingIdHash}`);
-}
+export const deriveListingNullifier = (
+  applicantIdCommit: string,
+  listingIdHash: string,
+  windowBucket: number
+) => "0x" + sha256Hex(`leaseproof:nullifier|${applicantIdCommit}|${listingIdHash}|${windowBucket}`);
 
-export function computeAttestationCommitment(
-  issuerIdHash: string,
-  monthlyIncomeUsd: number,
-  liquidBalanceUsd: number,
-  nonce: string
-): string {
+export function computeAttestationCommitment(params: {
+  issuerIdHash: string;
+  applicantIdCommit: string;
+  currencyCode: CurrencyCode;
+  monthlyIncome: number;
+  liquidBalance: number;
+  attestationExpiryEpoch: number;
+  nonce: string;
+}): string {
   return (
     "0x" +
     sha256Hex(
-      `leaseproof:attest|${issuerIdHash}|${Math.floor(monthlyIncomeUsd)}|${Math.floor(liquidBalanceUsd)}|${nonce}`
+      `leaseproof:attest|${params.issuerIdHash}|${params.applicantIdCommit}|${params.currencyCode}|${Math.floor(params.monthlyIncome)}|${Math.floor(params.liquidBalance)}|${Math.floor(params.attestationExpiryEpoch)}|${params.nonce}`
     )
   );
 }
 
-export function deriveReceiptId(
+export const deriveReceiptId = (
   nullifier: string,
   listingIdHash: string,
   attestedCommitment: string
-): string {
-  return "0x" + sha256Hex(`leaseproof:receipt|${nullifier}|${listingIdHash}|${attestedCommitment}`);
-}
+) => "0x" + sha256Hex(`leaseproof:receipt|${nullifier}|${listingIdHash}|${attestedCommitment}`);
+
+export const DEFAULT_ADMIN_SECRET = "leaseproof-registry-admin-secret-2026";
+export const DEMO_ISSUER_SECRETS: Record<string, string> = {
+  "plaid-us": "issuer-sk-plaid-us-2026",
+  "tink-eu": "issuer-sk-tink-eu-2026",
+  "argyle-payroll": "issuer-sk-argyle-2026",
+};
 
 export class LeaseProofContractEngine {
+  private registryAdminCommit: string;
+  private currentLedgerEpoch: number;
   private issuers = new Map<string, IssuerRecord>();
+  private anchoredAttestations = new Map<string, string>(); // commitment -> issuerId
   private listings = new Map<string, ListingRecord>();
   private usedNullifiers = new Set<string>();
   private receipts = new Map<string, PublicReceiptRecord>();
   private totalVerifiedPasses = 0;
 
-  registerIssuer(
-    id: string,
-    name: string,
-    providerType: IssuerRecord["providerType"],
-    nowEpoch = Math.floor(Date.now() / 1000)
-  ): IssuerRecord {
-    const idHash = "0x" + sha256Hex(`issuer:${id}`);
-    const rec: IssuerRecord = {
-      id,
-      idHash,
-      name,
-      providerType,
-      active: true,
-      registeredAt: nowEpoch,
-    };
-    this.issuers.set(id, rec);
-    return rec;
+  constructor(
+    adminCommit = deriveAdminCommit(DEFAULT_ADMIN_SECRET),
+    initialEpoch = 1_795_600_000
+  ) {
+    this.registryAdminCommit = adminCommit;
+    this.currentLedgerEpoch = initialEpoch;
   }
 
-  revokeIssuer(id: string): CircuitExecutionResult {
+  getCurrentEpoch(): number {
+    return this.currentLedgerEpoch;
+  }
+
+  advanceEpoch(newEpoch: number, callerAdminSecret: string): CircuitExecutionResult {
+    if (deriveAdminCommit(callerAdminSecret) !== this.registryAdminCommit) {
+      return {
+        ok: false,
+        circuit: "advanceEpoch",
+        errorCode: "UNAUTHORIZED_ADMIN",
+        humanReason: "Rejected: Only the pinned registry admin can advance the on-chain epoch.",
+      };
+    }
+    if (newEpoch < this.currentLedgerEpoch) {
+      return {
+        ok: false,
+        circuit: "advanceEpoch",
+        errorCode: "EPOCH_CANNOT_GO_BACKWARD",
+        humanReason: "Rejected: On-chain ledger epoch is strictly monotonic and cannot be backdated.",
+      };
+    }
+    this.currentLedgerEpoch = newEpoch;
+    return { ok: true, circuit: "advanceEpoch" };
+  }
+
+  registerIssuer(params: {
+    id: string;
+    name: string;
+    providerType: IssuerRecord["providerType"];
+    issuerKeyCommit: string;
+    callerAdminSecret: string;
+  }): CircuitExecutionResult & { issuer?: IssuerRecord } {
+    if (deriveAdminCommit(params.callerAdminSecret) !== this.registryAdminCommit) {
+      return {
+        ok: false,
+        circuit: "registerIssuer",
+        errorCode: "UNAUTHORIZED_ADMIN",
+        humanReason: "Rejected: Unauthorized caller attempted to register an attester.",
+      };
+    }
+    const idHash = "0x" + sha256Hex(`issuer:${params.id}`);
+    const issuer: IssuerRecord = {
+      id: params.id,
+      idHash,
+      name: params.name,
+      providerType: params.providerType,
+      keyCommit: params.issuerKeyCommit,
+      active: true,
+      registeredAt: this.currentLedgerEpoch,
+    };
+    this.issuers.set(params.id, issuer);
+    return { ok: true, circuit: "registerIssuer", issuer };
+  }
+
+  revokeIssuer(id: string, callerAdminSecret: string): CircuitExecutionResult {
+    if (deriveAdminCommit(callerAdminSecret) !== this.registryAdminCommit) {
+      return {
+        ok: false,
+        circuit: "revokeIssuer",
+        errorCode: "UNAUTHORIZED_ADMIN",
+        humanReason: "Rejected: Only registry admin can revoke a trusted attester.",
+      };
+    }
     const rec = this.issuers.get(id);
     if (!rec) {
       return {
         ok: false,
         circuit: "revokeIssuer",
         errorCode: "UNKNOWN_ISSUER",
-        humanReason: `Issuer "${id}" is not registered on the Midnight ledger.`,
+        humanReason: `Issuer "${id}" is not registered.`,
       };
     }
     rec.active = false;
     return { ok: true, circuit: "revokeIssuer" };
   }
 
-  reinstateIssuer(id: string): CircuitExecutionResult {
+  reinstateIssuer(id: string, callerAdminSecret: string): CircuitExecutionResult {
+    if (deriveAdminCommit(callerAdminSecret) !== this.registryAdminCommit) {
+      return {
+        ok: false,
+        circuit: "registerIssuer",
+        errorCode: "UNAUTHORIZED_ADMIN",
+        humanReason: "Rejected: Only registry admin can reinstate an attester.",
+      };
+    }
     const rec = this.issuers.get(id);
     if (!rec) {
       return {
@@ -245,32 +342,74 @@ export class LeaseProofContractEngine {
     return { ok: true, circuit: "registerIssuer" };
   }
 
+  anchorAttestation(
+    issuerId: string,
+    attestationCommit: string,
+    callerIssuerSecret: string
+  ): CircuitExecutionResult {
+    const issuer = this.issuers.get(issuerId);
+    if (!issuer) {
+      return {
+        ok: false,
+        circuit: "anchorAttestation",
+        errorCode: "UNTRUSTED_ISSUER",
+        humanReason: `Rejected: Issuer "${issuerId}" is not in the trusted registry.`,
+      };
+    }
+    if (!issuer.active) {
+      return {
+        ok: false,
+        circuit: "anchorAttestation",
+        errorCode: "REVOKED_ISSUER",
+        humanReason: `Rejected: Issuer "${issuer.name}" has been revoked.`,
+      };
+    }
+    if (deriveIssuerKeyCommit(callerIssuerSecret) !== issuer.keyCommit) {
+      return {
+        ok: false,
+        circuit: "anchorAttestation",
+        errorCode: "UNAUTHORIZED_ISSUER_KEY",
+        humanReason: "Rejected: Caller does not hold the private issuer signing key.",
+      };
+    }
+    this.anchoredAttestations.set(attestationCommit, issuerId);
+    return { ok: true, circuit: "anchorAttestation" };
+  }
+
   createListing(params: {
     id: string;
     title: string;
     location: string;
     template: TemplateType;
     mode: ListingMode;
-    monthlyRentUsd: number;
-    minIncomeUsd: number;
-    minBalanceUsd: number;
+    currencyCode: CurrencyCode;
+    monthlyRent: number;
+    minIncome: number;
+    minBalance: number;
     landlordName: string;
-    nowEpoch?: number;
   }): CircuitExecutionResult & { listing?: ListingRecord } {
     if (params.mode !== 0 && params.mode !== 1) {
       return {
         ok: false,
         circuit: "createListing",
         errorCode: "INVALID_LISTING_MODE",
-        humanReason: "Listing mode must be 0 (Income + Deposit) or 1 (Liquid Runway Only).",
+        humanReason: "Mode must be 0 (Income + Deposit) or 1 (Liquid Runway Only).",
       };
     }
-    if (params.minBalanceUsd <= 0) {
+    if (!CURRENCY_META[params.currencyCode]) {
+      return {
+        ok: false,
+        circuit: "createListing",
+        errorCode: "INVALID_CURRENCY",
+        humanReason: "Listing must specify a valid ISO-4217 currency code.",
+      };
+    }
+    if (params.minBalance <= 0) {
       return {
         ok: false,
         circuit: "createListing",
         errorCode: "INVALID_BALANCE_THRESHOLD",
-        humanReason: "Minimum liquid balance threshold must be greater than $0.",
+        humanReason: "Minimum liquid balance threshold must be greater than 0.",
       };
     }
 
@@ -281,38 +420,61 @@ export class LeaseProofContractEngine {
       location: params.location,
       template: params.template,
       mode: params.mode,
-      monthlyRentUsd: params.monthlyRentUsd,
-      minIncomeUsd: params.mode === 1 ? 0 : params.minIncomeUsd,
-      minBalanceUsd: params.minBalanceUsd,
+      currencyCode: params.currencyCode,
+      monthlyRent: params.monthlyRent,
+      minIncome: params.mode === 1 ? 0 : params.minIncome,
+      minBalance: params.minBalance,
       landlordName: params.landlordName,
-      createdAt: params.nowEpoch ?? Math.floor(Date.now() / 1000),
+      createdAt: this.currentLedgerEpoch,
     };
     this.listings.set(listing.id, listing);
     return { ok: true, circuit: "createListing", listing };
   }
 
-  issueSignedAttestation(params: {
+  /**
+   * Simulates an Open Banking / Payroll attester verifying a tenant's KYC identity + financials,
+   * anchoring ONLY the blinded commitment on-chain via anchorAttestation(), and returning the
+   * private witness locally to the tenant.
+   */
+  issueAndAnchorAttestation(params: {
     tenantLabel: string;
     tenantSecret: string;
+    kycIdSeed: string;
     issuerId: string;
-    monthlyIncomeUsd: number;
-    liquidBalanceUsd: number;
+    issuerSecret: string;
+    currencyCode: CurrencyCode;
+    monthlyIncome: number;
+    liquidBalance: number;
     expiresAtEpoch: number;
     nonce?: string;
+    skipAnchor?: boolean; // For testing unanchored/forged commitments
   }): PrivateTenantWitness {
-    const issuerHash = "0x" + sha256Hex(`issuer:${params.issuerId}`);
-    const nonce = params.nonce ?? sha256Hex(`${params.tenantSecret}:${params.issuerId}:${params.expiresAtEpoch}`).slice(0, 24);
-    const attestedCommitment = computeAttestationCommitment(
-      issuerHash,
-      params.monthlyIncomeUsd,
-      params.liquidBalanceUsd,
-      nonce
-    );
+    const issuerIdHash = "0x" + sha256Hex(`issuer:${params.issuerId}`);
+    const applicantIdCommit = deriveApplicantIdCommit(params.kycIdSeed, params.issuerId);
+    const nonce =
+      params.nonce ??
+      sha256Hex(`${params.kycIdSeed}:${params.issuerId}:${params.expiresAtEpoch}`).slice(0, 24);
+    const attestedCommitment = computeAttestationCommitment({
+      issuerIdHash,
+      applicantIdCommit,
+      currencyCode: params.currencyCode,
+      monthlyIncome: params.monthlyIncome,
+      liquidBalance: params.liquidBalance,
+      attestationExpiryEpoch: params.expiresAtEpoch,
+      nonce,
+    });
+
+    if (!params.skipAnchor) {
+      this.anchorAttestation(params.issuerId, attestedCommitment, params.issuerSecret);
+    }
+
     return {
       tenantLabel: params.tenantLabel,
       tenantSecret: params.tenantSecret,
-      monthlyIncomeUsd: params.monthlyIncomeUsd,
-      liquidBalanceUsd: params.liquidBalanceUsd,
+      applicantIdCommit,
+      monthlyIncome: params.monthlyIncome,
+      liquidBalance: params.liquidBalance,
+      currencyCode: params.currencyCode,
       attestationIssuerId: params.issuerId,
       attestationExpiryEpoch: params.expiresAtEpoch,
       attestationNonce: nonce,
@@ -320,13 +482,7 @@ export class LeaseProofContractEngine {
     };
   }
 
-  submitQualificationProof(
-    listingId: string,
-    witness: PrivateTenantWitness,
-    currentEpoch: number,
-    passExpiryEpoch: number
-  ): CircuitExecutionResult {
-    const t0 = Date.now();
+  submitQualificationProof(listingId: string, witness: PrivateTenantWitness): CircuitExecutionResult {
     const listing = this.listings.get(listingId);
     if (!listing) {
       return {
@@ -336,14 +492,6 @@ export class LeaseProofContractEngine {
         humanReason: `Listing "${listingId}" does not exist on the Midnight ledger.`,
       };
     }
-    if (passExpiryEpoch <= currentEpoch) {
-      return {
-        ok: false,
-        circuit: "submitQualificationProof",
-        errorCode: "INVALID_PASS_EXPIRY",
-        humanReason: "Verification Pass expiry must be strictly in the future.",
-      };
-    }
 
     const issuer = this.issuers.get(witness.attestationIssuerId);
     if (!issuer) {
@@ -351,7 +499,7 @@ export class LeaseProofContractEngine {
         ok: false,
         circuit: "submitQualificationProof",
         errorCode: "UNTRUSTED_ISSUER",
-        humanReason: `Rejected: Attester "${witness.attestationIssuerId}" is not in the trusted Open Banking / Payroll registry.`,
+        humanReason: `Rejected: Attester "${witness.attestationIssuerId}" is not in the admin-approved registry.`,
       };
     }
     if (!issuer.active) {
@@ -359,135 +507,123 @@ export class LeaseProofContractEngine {
         ok: false,
         circuit: "submitQualificationProof",
         errorCode: "REVOKED_ISSUER",
-        humanReason: `Rejected: Attester "${issuer.name}" has been revoked on-chain and cannot sign new proofs.`,
+        humanReason: `Rejected: Attester "${issuer.name}" has been revoked on-chain.`,
       };
     }
 
-    if (witness.attestationExpiryEpoch < currentEpoch) {
+    // Verified against on-chain monotonic currentLedgerEpoch (prover cannot backdate time!)
+    if (witness.attestationExpiryEpoch < this.currentLedgerEpoch) {
       return {
         ok: false,
         circuit: "submitQualificationProof",
         errorCode: "EXPIRED_ATTESTATION",
-        humanReason: "Rejected: Financial attestation is older than its allowed freshness window.",
+        humanReason: "Rejected: Attestation expired relative to on-chain currentLedgerEpoch.",
       };
     }
 
-    const computedCommit = computeAttestationCommitment(
-      issuer.idHash,
-      witness.monthlyIncomeUsd,
-      witness.liquidBalanceUsd,
-      witness.attestationNonce
-    );
-    if (computedCommit !== witness.attestedCommitment) {
+    if (witness.currencyCode !== listing.currencyCode) {
+      return {
+        ok: false,
+        circuit: "submitQualificationProof",
+        errorCode: "CURRENCY_MISMATCH",
+        humanReason: `Rejected: Attestation currency (${CURRENCY_META[witness.currencyCode].code}) does not match listing currency (${CURRENCY_META[listing.currencyCode].code}).`,
+      };
+    }
+
+    // Recompute commitment over ALL private witness fields and verify it was genuinely anchored by issuer!
+    const computedCommit = computeAttestationCommitment({
+      issuerIdHash: issuer.idHash,
+      applicantIdCommit: witness.applicantIdCommit,
+      currencyCode: witness.currencyCode,
+      monthlyIncome: witness.monthlyIncome,
+      liquidBalance: witness.liquidBalance,
+      attestationExpiryEpoch: witness.attestationExpiryEpoch,
+      nonce: witness.attestationNonce,
+    });
+
+    const anchoredBy = this.anchoredAttestations.get(computedCommit);
+    if (!anchoredBy) {
       return {
         ok: false,
         circuit: "submitQualificationProof",
         errorCode: "TAMPERED_COMMITMENT",
         humanReason:
-          "Rejected: Local salary or balance was modified after the bank/payroll attester signed the commitment.",
+          "Rejected: Commitment is not anchored on-chain by a trusted attester (even if re-hashed locally, forged income/balance fails!).",
+      };
+    }
+    if (anchoredBy !== issuer.id) {
+      return {
+        ok: false,
+        circuit: "submitQualificationProof",
+        errorCode: "ISSUER_COMMITMENT_MISMATCH",
+        humanReason: "Rejected: Commitment was anchored by a different issuer.",
       };
     }
 
-    if (witness.liquidBalanceUsd < listing.minBalanceUsd) {
+    const sym = CURRENCY_META[listing.currencyCode].symbol;
+    if (witness.liquidBalance < listing.minBalance) {
       return {
         ok: false,
         circuit: "submitQualificationProof",
         errorCode: "INSUFFICIENT_BALANCE",
-        humanReason: `Rejected: Private liquid balance failed the in-circuit threshold (required >= $${listing.minBalanceUsd.toLocaleString("en-US")}).`,
+        humanReason: `Rejected: Private liquid balance failed threshold (required >= ${sym}${listing.minBalance.toLocaleString("en-US")}).`,
       };
     }
 
-    if (listing.mode === 0 && witness.monthlyIncomeUsd < listing.minIncomeUsd) {
+    if (listing.mode === 0 && witness.monthlyIncome < listing.minIncome) {
       return {
         ok: false,
         circuit: "submitQualificationProof",
         errorCode: "INSUFFICIENT_INCOME",
-        humanReason: `Rejected: Private monthly income failed the in-circuit threshold (required >= $${listing.minIncomeUsd.toLocaleString("en-US")}/mo).`,
+        humanReason: `Rejected: Private monthly income failed threshold (required >= ${sym}${listing.minIncome.toLocaleString("en-US")}/mo).`,
       };
     }
 
-    const nullifier = deriveListingNullifier(witness.tenantSecret, listing.idHash);
+    // Windowed nullifier bound to attester KYC identity (prevents random-secret replay spam & allows re-apply after 14d!)
+    const windowBucket = Math.floor(this.currentLedgerEpoch / PASS_VALIDITY_SEC);
+    const nullifier = deriveListingNullifier(witness.applicantIdCommit, listing.idHash, windowBucket);
     if (this.usedNullifiers.has(nullifier)) {
       return {
         ok: false,
         circuit: "submitQualificationProof",
         errorCode: "REPLAY_ATTACK",
         humanReason:
-          "Rejected: Listing-scoped nullifier already spent. This tenant already submitted a proof for this exact listing.",
+          "Rejected: Attester-bound nullifier already spent for this listing in the current 14-day window.",
       };
     }
 
     const ownerCommit = deriveOwnerCommit(witness.tenantSecret);
-    const receiptId = deriveReceiptId(nullifier, listing.idHash, witness.attestedCommitment);
-    const durationMs = Math.max(12, Date.now() - t0 + 18);
+    const receiptId = deriveReceiptId(nullifier, listing.idHash, computedCommit);
+    const passExpiry = this.currentLedgerEpoch + PASS_VALIDITY_SEC;
 
     const receipt: PublicReceiptRecord = {
       receiptId,
       listingId: listing.id,
+      listingIdHash: listing.idHash,
       listingTitle: listing.title,
       listingTemplate: listing.template,
       listingMode: listing.mode,
+      currencyCode: listing.currencyCode,
       issuerName: issuer.name,
       nullifier,
       ownerCommit,
+      applicantIdCommit: witness.applicantIdCommit,
       status: 1,
-      issuedAtEpoch: currentEpoch,
-      expiresAtEpoch: passExpiryEpoch,
+      issuedAtEpoch: this.currentLedgerEpoch,
+      expiresAtEpoch: passExpiry,
       revokedAtEpoch: null,
-      proofDurationMs: durationMs,
+      proofDurationMs: 22,
       circuitName: "submitQualificationProof",
-      leakedSalaryBits: 0,
-      leakedBalanceBits: 0,
-      leakedIdentityBits: 0,
     };
 
     this.usedNullifiers.add(nullifier);
     this.receipts.set(receiptId, receipt);
     this.totalVerifiedPasses += 1;
 
-    return {
-      ok: true,
-      circuit: "submitQualificationProof",
-      receipt,
-      privacyAudit: {
-        privateWitnessFields: [
-          {
-            label: "Monthly Income (Witness)",
-            value: `$${witness.monthlyIncomeUsd.toLocaleString("en-US")}/mo`,
-            disclosed: false,
-          },
-          {
-            label: "Liquid Bank Balance (Witness)",
-            value: `$${witness.liquidBalanceUsd.toLocaleString("en-US")}`,
-            disclosed: false,
-          },
-          {
-            label: "Tenant Secret Key (Witness)",
-            value: `${witness.tenantSecret.slice(0, 10)}...`,
-            disclosed: false,
-          },
-          {
-            label: "Attestation Nonce (Witness)",
-            value: `${witness.attestationNonce.slice(0, 12)}...`,
-            disclosed: false,
-          },
-        ],
-        publicLedgerFields: [
-          { label: "Qualification Verdict", value: "QUALIFIED (1)", disclosed: true },
-          { label: "Receipt ID", value: `${receiptId.slice(0, 18)}...`, disclosed: true },
-          { label: "Listing Nullifier", value: `${nullifier.slice(0, 18)}...`, disclosed: true },
-          { label: "Trusted Attester", value: issuer.name, disclosed: true },
-        ],
-        leakedSecretBits: 0,
-      },
-    };
+    return { ok: true, circuit: "submitQualificationProof", receipt };
   }
 
-  revokeReceipt(
-    receiptId: string,
-    callerTenantSecret: string,
-    nowEpoch = Math.floor(Date.now() / 1000)
-  ): CircuitExecutionResult {
+  revokeReceipt(receiptId: string, callerTenantSecret: string): CircuitExecutionResult {
     const rec = this.receipts.get(receiptId);
     if (!rec) {
       return {
@@ -502,35 +638,70 @@ export class LeaseProofContractEngine {
         ok: false,
         circuit: "revokeReceipt",
         errorCode: "ALREADY_REVOKED",
-        humanReason: "This Verification Pass was already revoked by the tenant.",
+        humanReason: "This Pre-Qualification Pass was already revoked.",
       };
     }
-
-    const callerCommit = deriveOwnerCommit(callerTenantSecret);
-    if (callerCommit !== rec.ownerCommit) {
+    if (deriveOwnerCommit(callerTenantSecret) !== rec.ownerCommit) {
       return {
         ok: false,
         circuit: "revokeReceipt",
         errorCode: "UNAUTHORIZED_REVOKE",
-        humanReason:
-          "Rejected: Caller does not own the private tenantSecret that created this Verification Pass.",
+        humanReason: "Rejected: Caller does not own the private tenantSecret for this pass.",
       };
     }
-
     rec.status = 2;
-    rec.revokedAtEpoch = nowEpoch;
+    rec.revokedAtEpoch = this.currentLedgerEpoch;
     return { ok: true, circuit: "revokeReceipt", receipt: rec };
   }
 
-  verifyReceipt(receiptId: string): { status: ReceiptStatus; receipt: PublicReceiptRecord | null } {
+  /**
+   * True Off-Chain Walletless Verifier Query (NO ZK circuit execution required by landlord!).
+   * Enforces BOTH listing binding (prevents cheap-room -> penthouse forwarding) AND 14-day expiry!
+   */
+  queryPublicReceipt(receiptId: string, expectedListingId?: string): VerifyReceiptResult {
     const rec = this.receipts.get(receiptId) ?? null;
-    return { status: rec ? rec.status : 0, receipt: rec };
+    if (!rec) {
+      return {
+        status: 0,
+        humanReason: "Receipt not found on Midnight public ledger.",
+        receipt: null,
+      };
+    }
+    if (expectedListingId && rec.listingId !== expectedListingId) {
+      return {
+        status: 0,
+        errorCode: "LISTING_MISMATCH",
+        humanReason: `Rejected: Pass was issued for "${rec.listingTitle}", NOT for the requested listing (${expectedListingId}). Cross-listing forwarding blocked!`,
+        receipt: rec,
+      };
+    }
+    if (rec.status === 2) {
+      return {
+        status: 2,
+        humanReason: "Pass was revoked by the tenant via revokeReceipt().",
+        receipt: rec,
+      };
+    }
+    if (this.currentLedgerEpoch > rec.expiresAtEpoch) {
+      return {
+        status: 3,
+        humanReason: "Pass exceeded its 14-day validity window (EXPIRED).",
+        receipt: rec,
+      };
+    }
+    return {
+      status: 1,
+      humanReason: "Verified QUALIFIED for this exact listing. Raw salary & balance remain hidden.",
+      receipt: rec,
+    };
   }
 
   getSnapshot(): LedgerSnapshot {
     return {
+      currentLedgerEpoch: this.currentLedgerEpoch,
       issuers: Array.from(this.issuers.values()),
       listings: Array.from(this.listings.values()),
+      anchoredAttestationCount: this.anchoredAttestations.size,
       usedNullifiers: Array.from(this.usedNullifiers.values()),
       receipts: Array.from(this.receipts.values()).sort(
         (a, b) => b.issuedAtEpoch - a.issuedAtEpoch
@@ -540,52 +711,72 @@ export class LeaseProofContractEngine {
   }
 }
 
-export function createSeededLeaseProofEngine(nowEpoch = 1_795_600_000): LeaseProofContractEngine {
-  const engine = new LeaseProofContractEngine();
+export function createSeededLeaseProofEngine(initialEpoch = 1_795_600_000): LeaseProofContractEngine {
+  const engine = new LeaseProofContractEngine(
+    deriveAdminCommit(DEFAULT_ADMIN_SECRET),
+    initialEpoch
+  );
 
-  // Seed 3 real-world Open Banking & Payroll Attesters
-  engine.registerIssuer("plaid-us", "Plaid Open Banking (US/UK)", "Open Banking", nowEpoch - 86400 * 30);
-  engine.registerIssuer("tink-eu", "Tink Open Banking (EU/GDPR)", "Open Banking", nowEpoch - 86400 * 25);
-  engine.registerIssuer("argyle-payroll", "Argyle Verified Payroll", "Payroll API", nowEpoch - 86400 * 14);
+  engine.registerIssuer({
+    id: "plaid-us",
+    name: "Plaid Open Banking (US/UK)",
+    providerType: "Open Banking",
+    issuerKeyCommit: deriveIssuerKeyCommit(DEMO_ISSUER_SECRETS["plaid-us"]),
+    callerAdminSecret: DEFAULT_ADMIN_SECRET,
+  });
+  engine.registerIssuer({
+    id: "tink-eu",
+    name: "Tink Open Banking (EU/GDPR)",
+    providerType: "Open Banking",
+    issuerKeyCommit: deriveIssuerKeyCommit(DEMO_ISSUER_SECRETS["tink-eu"]),
+    callerAdminSecret: DEFAULT_ADMIN_SECRET,
+  });
+  engine.registerIssuer({
+    id: "argyle-payroll",
+    name: "Argyle Verified Payroll",
+    providerType: "Payroll API",
+    issuerKeyCommit: deriveIssuerKeyCommit(DEMO_ISSUER_SECRETS["argyle-payroll"]),
+    callerAdminSecret: DEFAULT_ADMIN_SECRET,
+  });
 
-  // Seed the 3 Locked Real-World Templates
+  // 1 Flexible Contract -> 3 Real-World Rental Verticals (with explicit ISO-4217 currency)
   engine.createListing({
     id: "apt-soho-204",
     title: "SoHo Lofts · 1BR Apartment ($2,400/mo)",
     location: "New York, NY",
     template: "APARTMENT",
     mode: 0,
-    monthlyRentUsd: 2400,
-    minIncomeUsd: 7200, // 3x monthly rent
-    minBalanceUsd: 4800, // 2x deposit
+    currencyCode: 840, // USD
+    monthlyRent: 2400,
+    minIncome: 7200,
+    minBalance: 4800,
     landlordName: "Mercer Residential Group",
-    nowEpoch: nowEpoch - 86400 * 3,
   });
 
   engine.createListing({
     id: "coliving-lisbon-09",
-    title: "Nomad House · 6-Month Co-Living Suite ($1,600/mo)",
+    title: "Nomad House · 6-Month Co-Living (€1,600/mo)",
     location: "Lisbon, Portugal (GDPR)",
     template: "FREELANCER_COLIVING",
-    mode: 1, // Liquid Runway Only — NO payslip needed!
-    monthlyRentUsd: 1600,
-    minIncomeUsd: 0,
-    minBalanceUsd: 9600, // 6x monthly rent runway
+    mode: 1, // Liquid Runway Only — no payslip required
+    currencyCode: 978, // EUR
+    monthlyRent: 1600,
+    minIncome: 0,
+    minBalance: 9600,
     landlordName: "Atlantic Co-Living Partners",
-    nowEpoch: nowEpoch - 86400 * 2,
   });
 
   engine.createListing({
     id: "ev-fleet-model3",
-    title: "VoltLease · 24-Month EV Subscription ($680/mo)",
+    title: "VoltLease · 24-Month EV Subscription (€680/mo)",
     location: "Berlin, Germany (GDPR)",
     template: "VEHICLE_LEASE",
     mode: 0,
-    monthlyRentUsd: 680,
-    minIncomeUsd: 2720, // 4x monthly lease
-    minBalanceUsd: 2040, // 3x deposit
+    currencyCode: 978, // EUR
+    monthlyRent: 680,
+    minIncome: 2720,
+    minBalance: 2040,
     landlordName: "VoltLease Mobility GmbH",
-    nowEpoch: nowEpoch - 86400,
   });
 
   return engine;

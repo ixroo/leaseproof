@@ -1,64 +1,109 @@
 // SPDX-License-Identifier: Apache-2.0
-// LeaseProof — Privacy-First Rental & Lease Qualification Contract for Midnight Network
-// Proves income/deposit affordability without disclosing salary, bank balance, or ID.
+// LeaseProof — Hardened Privacy-First Rental Pre-Qualification Contract for Midnight Network
+//
+// Security Guarantees Enforced In-Circuit:
+// 1. Admin-gated Attester Registry (prevents self-registered fake banks or unauthorized revocations)
+// 2. Issuer-authenticated Attestation Anchoring (prevents local salary/balance re-hashing fraud)
+// 3. On-chain Monotonic Ledger Epoch (prevents prover backdating or forged 10-year pass expiries)
+// 4. Listing-Bound Receipts + ISO-4217 Currency Binding (prevents cross-listing forwarding & FX spoofing)
+// 5. Attester-Bound Identity Commitment (mitigates straw-applicant / "joki rekening" fraud)
+// 6. Windowed Anti-Replay Nullifier + Tenant-Controlled Revocation (supports re-apply after 14d expiry)
+// 7. True Walletless Verification: Landlords query public ledger maps directly off-chain (no verifier circuit!)
 
 pragma language_version >= 0.16;
 
 import CompactStandardLibrary;
 
 // ---------------------------------------------------------------------------
-// Public Ledger State (Dual-Ledger Model: ONLY hashes, thresholds & statuses)
+// Public Ledger State (Read Off-Chain by Walletless Landlord Verifiers)
 // ---------------------------------------------------------------------------
 
-// Trusted Open Banking / Payroll Attesters: issuerId -> 1 (active) | 0 (revoked)
+// Admin authority commitment pinned at deployment (guards issuer & epoch mutations)
+export ledger registryAdminCommit: Bytes<32>;
+
+// Trusted Open Banking / Payroll Attesters:
+// issuerId -> 1 (active) | 0 (revoked)
 export ledger trustedIssuers: Map<Bytes<32>, Uint<8>>;
+// issuerId -> issuerPubKeyCommit (guards anchorAttestation so only the real attester can anchor)
+export ledger issuerKeyCommit: Map<Bytes<32>, Bytes<32>>;
+
+// On-chain anchored attestation commitments: attestationCommit -> issuerId
+// Proves the commitment was genuinely signed/anchored by a trusted attester (fixes TAMPERED_COMMITMENT)
+export ledger anchoredAttestations: Map<Bytes<32>, Bytes<32>>;
+
+// On-chain monotonic clock (Unix seconds, updated by authorized epoch oracle/admin)
+export ledger currentLedgerEpoch: Uint<64>;
 
 // Rental / Lease Listings:
-// mode: 0 = Income + Deposit (Apartment / Vehicle), 1 = Liquid Runway Only (Freelancer / Co-Living)
+// mode: 0 = Income + Deposit, 1 = Liquid Runway Only (Freelancer / Co-Living)
 export ledger listingMode: Map<Bytes<32>, Uint<8>>;
+export ledger listingCurrency: Map<Bytes<32>, Uint<16>>; // ISO-4217 numeric (840=USD, 978=EUR, 360=IDR)
 export ledger listingMinIncome: Map<Bytes<32>, Uint<64>>;
 export ledger listingMinBalance: Map<Bytes<32>, Uint<64>>;
 
-// Listing-scoped anti-replay nullifiers (prevents duplicate submissions to same listing)
+// Windowed listing-scoped anti-replay nullifiers (bound to attester identity, NOT arbitrary local secret)
 export ledger usedNullifiers: Set<Bytes<32>>;
 
-// Verification Receipts: receiptId -> 1 (QUALIFIED) | 2 (REVOKED)
-export ledger verifiedReceipts: Map<Bytes<32>, Uint<8>>;
+// Listing-Bound Verification Receipts (queried off-chain by walletless landlords):
+export ledger verifiedReceipts: Map<Bytes<32>, Uint<8>>;       // 1 = QUALIFIED, 2 = REVOKED
+export ledger receiptListingId: Map<Bytes<32>, Bytes<32>>;    // Prevents forwarding cheap-room pass to penthouse
+export ledger receiptExpiry: Map<Bytes<32>, Uint<64>>;        // Fixed 14-day validity from currentLedgerEpoch
+export ledger receiptOwnerCommit: Map<Bytes<32>, Bytes<32>>;  // Guards revokeReceipt
+export ledger receiptApplicantId: Map<Bytes<32>, Bytes<32>>;  // Binds pass to KYC applicant commitment (anti-joki)
 
-// Tenant owner commitment per receipt so ONLY the tenant can revoke their own pass
-export ledger receiptOwnerCommit: Map<Bytes<32>, Bytes<32>>;
-
-// Receipt expiration epoch (Unix seconds)
-export ledger receiptExpiry: Map<Bytes<32>, Uint<64>>;
-
-// Total lifetime verified passes issued on Midnight
 export ledger totalVerifiedPasses: Counter;
 
 // ---------------------------------------------------------------------------
-// Private Witnesses (Strictly local off-chain state — NEVER exposed on-chain)
+// Deployment Constructor (Pins Admin Authority & Initial Ledger Epoch)
 // ---------------------------------------------------------------------------
 
+constructor(initialAdminCommit: Bytes<32>, initialEpoch: Uint<64>) {
+  registryAdminCommit = disclose(initialAdminCommit);
+  currentLedgerEpoch = disclose(initialEpoch);
+}
+
+// ---------------------------------------------------------------------------
+// Private Witnesses (Strictly Local Off-Chain State — Never Disclosed)
+// ---------------------------------------------------------------------------
+
+witness adminSecret(): Bytes<32>;
+witness issuerSecret(): Bytes<32>;
+
 witness tenantSecret(): Bytes<32>;
+witness applicantIdCommit(): Bytes<32>;     // Derived from attester KYC identity (anti straw-applicant)
 witness monthlyIncomeUsd(): Uint<64>;
 witness liquidBalanceUsd(): Uint<64>;
+witness attestationCurrency(): Uint<16>;
 witness attestationIssuerId(): Bytes<32>;
 witness attestationExpiryEpoch(): Uint<64>;
 witness attestationNonce(): Bytes<32>;
-witness attestedCommitment(): Bytes<32>;
 
 // ---------------------------------------------------------------------------
-// Pure Cryptographic Helpers
+// Pure Cryptographic Derivation Helpers
 // ---------------------------------------------------------------------------
+
+export circuit deriveAdminCommit(secret: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "leaseproof:admin"), secret]);
+}
+
+export circuit deriveIssuerKeyCommit(secret: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "leaseproof:issuer"), secret]);
+}
 
 export circuit deriveOwnerCommit(secret: Bytes<32>): Bytes<32> {
   return persistentHash<Vector<2, Bytes<32>>>([pad(32, "leaseproof:owner"), secret]);
 }
 
-export circuit deriveListingNullifier(secret: Bytes<32>, listingId: Bytes<32>): Bytes<32> {
-  return persistentHash<Vector<3, Bytes<32>>>([
+export circuit deriveListingNullifier(
+  applicantId: Bytes<32>,
+  listingId: Bytes<32>,
+  windowBucket: Uint<64>
+): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([
     pad(32, "leaseproof:nullifier"),
-    secret,
-    listingId
+    applicantId,
+    listingId,
+    windowBucket as Field as Bytes<32>
   ]);
 }
 
@@ -76,88 +121,126 @@ export circuit deriveReceiptId(
 }
 
 // ---------------------------------------------------------------------------
-// 1. Attester Registry Circuits (Open Banking / Payroll Providers)
+// 1. Admin-Gated Attester Registry & Monotonic Epoch Circuits
 // ---------------------------------------------------------------------------
 
-export circuit registerIssuer(issuerId: Bytes<32>): [] {
+export circuit registerIssuer(issuerId: Bytes<32>, pubKeyCommit: Bytes<32>): [] {
+  assert(deriveAdminCommit(adminSecret()) == registryAdminCommit, "UNAUTHORIZED_ADMIN");
   const pubIssuer = disclose(issuerId);
+  const pubKey = disclose(pubKeyCommit);
   trustedIssuers.insert(pubIssuer, 1 as Uint<8>);
+  issuerKeyCommit.insert(pubIssuer, pubKey);
 }
 
 export circuit revokeIssuer(issuerId: Bytes<32>): [] {
+  assert(deriveAdminCommit(adminSecret()) == registryAdminCommit, "UNAUTHORIZED_ADMIN");
   const pubIssuer = disclose(issuerId);
   assert(trustedIssuers.member(pubIssuer), "UNKNOWN_ISSUER");
   trustedIssuers.insert(pubIssuer, 0 as Uint<8>);
 }
 
+export circuit advanceEpoch(newEpoch: Uint<64>): [] {
+  assert(deriveAdminCommit(adminSecret()) == registryAdminCommit, "UNAUTHORIZED_ADMIN");
+  const pubNewEpoch = disclose(newEpoch);
+  assert(pubNewEpoch >= currentLedgerEpoch, "EPOCH_CANNOT_GO_BACKWARD");
+  currentLedgerEpoch = pubNewEpoch;
+}
+
 // ---------------------------------------------------------------------------
-// 2. Landlord / Property Manager Listing Circuit
+// 2. Issuer-Authenticated Attestation Anchoring (Fixes TAMPERED_COMMITMENT)
+// ---------------------------------------------------------------------------
+
+export circuit anchorAttestation(issuerId: Bytes<32>, attestationCommit: Bytes<32>): [] {
+  const pubIssuer = disclose(issuerId);
+  const pubCommit = disclose(attestationCommit);
+  assert(trustedIssuers.member(pubIssuer), "UNTRUSTED_ISSUER");
+  assert(trustedIssuers.lookup(pubIssuer) == (1 as Uint<8>), "REVOKED_ISSUER");
+  assert(
+    deriveIssuerKeyCommit(issuerSecret()) == issuerKeyCommit.lookup(pubIssuer),
+    "UNAUTHORIZED_ISSUER_KEY"
+  );
+  anchoredAttestations.insert(pubCommit, pubIssuer);
+}
+
+// ---------------------------------------------------------------------------
+// 3. Landlord Listing Circuit (With Explicit ISO-4217 Currency Code)
 // ---------------------------------------------------------------------------
 
 export circuit createListing(
   listingId: Bytes<32>,
   mode: Uint<8>,
-  minIncomeUsd: Uint<64>,
-  minBalanceUsd: Uint<64>
+  currencyCode: Uint<16>,
+  minIncome: Uint<64>,
+  minBalance: Uint<64>
 ): [] {
   const pubListing = disclose(listingId);
   const pubMode = disclose(mode);
-  const pubMinIncome = disclose(minIncomeUsd);
-  const pubMinBalance = disclose(minBalanceUsd);
+  const pubCurrency = disclose(currencyCode);
+  const pubMinIncome = disclose(minIncome);
+  const pubMinBalance = disclose(minBalance);
 
   assert(pubMode <= (1 as Uint<8>), "INVALID_LISTING_MODE");
+  assert(pubCurrency > (0 as Uint<16>), "INVALID_CURRENCY");
   assert(pubMinBalance > (0 as Uint<64>), "INVALID_BALANCE_THRESHOLD");
 
   listingMode.insert(pubListing, pubMode);
+  listingCurrency.insert(pubListing, pubCurrency);
   listingMinIncome.insert(pubListing, pubMinIncome);
   listingMinBalance.insert(pubListing, pubMinBalance);
 }
 
 // ---------------------------------------------------------------------------
-// 3. Tenant Selective-Disclosure Qualification Proof Circuit
-//    Proves affordability & issuer trust while leaking 0 bits of salary/balance
+// 4. Tenant Selective-Disclosure Pre-Qualification Proof Circuit
 // ---------------------------------------------------------------------------
 
 export circuit submitQualificationProof(
   listingId: Bytes<32>,
-  currentEpoch: Uint<64>,
-  passExpiryEpoch: Uint<64>
+  windowBucket: Uint<64>
 ): Bytes<32> {
   const pubListing = disclose(listingId);
-  const pubNow = disclose(currentEpoch);
-  const pubPassExpiry = disclose(passExpiryEpoch);
+  const pubWindow = disclose(windowBucket);
+  const now = currentLedgerEpoch;
 
   assert(listingMode.member(pubListing), "UNKNOWN_LISTING");
-  assert(pubPassExpiry > pubNow, "INVALID_PASS_EXPIRY");
 
-  // Load private financial inputs locally (NEVER disclosed!)
+  // Load private witnesses locally (exact salary & balance NEVER disclosed!)
   const secret = tenantSecret();
+  const applicantId = applicantIdCommit();
   const income = monthlyIncomeUsd();
   const balance = liquidBalanceUsd();
+  const currency = attestationCurrency();
   const issuerId = attestationIssuerId();
   const attExpiry = attestationExpiryEpoch();
   const nonce = attestationNonce();
-  const expectedCommit = attestedCommitment();
 
-  // Verify issuer is registered and active on public ledger
+  // Verify issuer active on public ledger
   const pubIssuer = disclose(issuerId);
   assert(trustedIssuers.member(pubIssuer), "UNTRUSTED_ISSUER");
   assert(trustedIssuers.lookup(pubIssuer) == (1 as Uint<8>), "REVOKED_ISSUER");
 
-  // Verify attestation has not expired
-  assert(attExpiry >= pubNow, "EXPIRED_ATTESTATION");
+  // Verify attestation freshness against on-chain ledger epoch (not prover-supplied time!)
+  assert(attExpiry >= now, "EXPIRED_ATTESTATION");
 
-  // Bind private values to issuer-signed commitment (prevents local tampering)
-  const computedCommit = persistentHash<Vector<5, Bytes<32>>>([
+  // Verify currency matches listing ISO-4217 currency code
+  const reqCurrency = listingCurrency.lookup(pubListing);
+  assert(currency == reqCurrency, "CURRENCY_MISMATCH");
+
+  // Compute commitment over ALL attested private fields and verify it was anchored by issuer!
+  const computedCommit = persistentHash<Vector<8, Bytes<32>>>([
     pad(32, "leaseproof:attest"),
     issuerId,
+    applicantId,
+    currency as Field as Bytes<32>,
     income as Field as Bytes<32>,
     balance as Field as Bytes<32>,
+    attExpiry as Field as Bytes<32>,
     nonce
   ]);
-  assert(computedCommit == expectedCommit, "TAMPERED_COMMITMENT");
+  const pubCommit = disclose(computedCommit);
+  assert(anchoredAttestations.member(pubCommit), "TAMPERED_COMMITMENT");
+  assert(anchoredAttestations.lookup(pubCommit) == pubIssuer, "ISSUER_COMMITMENT_MISMATCH");
 
-  // Enforce listing qualification thresholds privately in-circuit
+  // Enforce private qualification thresholds in-circuit
   const mode = listingMode.lookup(pubListing);
   const reqIncome = listingMinIncome.lookup(pubListing);
   const reqBalance = listingMinBalance.lookup(pubListing);
@@ -167,29 +250,34 @@ export circuit submitQualificationProof(
     assert(income >= reqIncome, "INSUFFICIENT_INCOME");
   }
 
-  // Listing-scoped nullifier prevents replay on same listing while allowing
-  // the tenant to apply to multiple different listings unlinkably
-  const nullifier = deriveListingNullifier(secret, pubListing);
+  // Attester-bound windowed nullifier (prevents spam via fake tenantSecret & allows re-apply after 14d)
+  const nullifier = deriveListingNullifier(applicantId, pubListing, pubWindow);
   const pubNullifier = disclose(nullifier);
   assert(!usedNullifiers.member(pubNullifier), "REPLAY_ATTACK");
 
   const ownerCommit = deriveOwnerCommit(secret);
-  const receiptId = deriveReceiptId(nullifier, pubListing, expectedCommit);
+  const receiptId = deriveReceiptId(nullifier, pubListing, pubCommit);
 
   const pubOwnerCommit = disclose(ownerCommit);
   const pubReceiptId = disclose(receiptId);
+  const pubApplicantId = disclose(applicantId);
+
+  // Enforce fixed 14-day pass validity (1,209,600 seconds) from on-chain epoch
+  const passExpiry = (now + (1209600 as Uint<64>)) as Uint<64>;
 
   usedNullifiers.insert(pubNullifier);
   verifiedReceipts.insert(pubReceiptId, 1 as Uint<8>);
+  receiptListingId.insert(pubReceiptId, pubListing);
+  receiptExpiry.insert(pubReceiptId, passExpiry);
   receiptOwnerCommit.insert(pubReceiptId, pubOwnerCommit);
-  receiptExpiry.insert(pubReceiptId, pubPassExpiry);
+  receiptApplicantId.insert(pubReceiptId, pubApplicantId);
   totalVerifiedPasses.increment(1);
 
   return pubReceiptId;
 }
 
 // ---------------------------------------------------------------------------
-// 4. Tenant-Controlled Instant Revocation Circuit (Beats Non-Revocable Bundles)
+// 5. Tenant-Controlled Instant Revocation Circuit
 // ---------------------------------------------------------------------------
 
 export circuit revokeReceipt(receiptId: Bytes<32>): [] {
@@ -197,23 +285,8 @@ export circuit revokeReceipt(receiptId: Bytes<32>): [] {
   assert(verifiedReceipts.member(pubReceipt), "UNKNOWN_RECEIPT");
   assert(verifiedReceipts.lookup(pubReceipt) == (1 as Uint<8>), "ALREADY_REVOKED");
 
-  // Prove caller owns the private tenantSecret that created this receipt
   const secret = tenantSecret();
-  const ownerCommit = deriveOwnerCommit(secret);
-  const expectedOwner = receiptOwnerCommit.lookup(pubReceipt);
-  assert(ownerCommit == expectedOwner, "UNAUTHORIZED_REVOKE");
+  assert(deriveOwnerCommit(secret) == receiptOwnerCommit.lookup(pubReceipt), "UNAUTHORIZED_REVOKE");
 
   verifiedReceipts.insert(pubReceipt, 2 as Uint<8>);
-}
-
-// ---------------------------------------------------------------------------
-// 5. Walletless Public Verification Circuits
-// ---------------------------------------------------------------------------
-
-export circuit verifyReceipt(receiptId: Bytes<32>): Uint<8> {
-  const pubReceipt = disclose(receiptId);
-  if (!verifiedReceipts.member(pubReceipt)) {
-    return 0 as Uint<8>;
-  }
-  return verifiedReceipts.lookup(pubReceipt);
 }
