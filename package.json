@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:compact": "vitest run contracts/__tests__/compiled-circuit.test.ts"
   },
   "dependencies": {
+    "@midnight-ntwrk/compact-runtime": "^0.21.0",
     "lucide-react": "^1.79.0",
     "next": "16.4.6",
     "react": "19.3.0",

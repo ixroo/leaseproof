@@ -19,8 +19,14 @@ import {
   ShieldOff,
   Sparkles,
   UserCheck,
+  Wallet,
   XCircle,
 } from "lucide-react";
+import {
+  connectMidnightLace,
+  shortMidnightAddr,
+  type LaceConnectionResult,
+} from "@/lib/midnight/laceWallet";
 import {
   computeAttestationCommitment,
   createSeededLeaseProofEngine,
@@ -92,6 +98,7 @@ export default function LeaseProofWorkspace() {
 
   // Attack Lab state
   const [attackLogs, setAttackLogs] = useState<AttackLogEntry[]>([]);
+  const [laceWallet, setLaceWallet] = useState<LaceConnectionResult | null>(null);
   const [toast, setToast] = useState<{ tone: "ok" | "danger"; title: string; detail: string } | null>(null);
 
   const showToast = (tone: "ok" | "danger", title: string, detail: string) => {
@@ -99,6 +106,26 @@ export default function LeaseProofWorkspace() {
     setTimeout(() => {
       setToast((cur) => (cur?.title === title ? null : cur));
     }, 3600);
+  };
+
+  const handleConnectLace = async () => {
+    const res = await connectMidnightLace();
+    setLaceWallet(res);
+    if (res.connected && res.address) {
+      showToast(
+        "ok",
+        `Lace Wallet Connected (${shortMidnightAddr(res.address)})`,
+        res.proverServerUri
+          ? `Midnight DApp Connector active · Prover: ${res.proverServerUri}`
+          : "Midnight DApp Connector active · Ready for Preprod proving."
+      );
+    } else {
+      showToast(
+        "ok",
+        "Walletless Sandbox Mode Active",
+        res.error ?? "Lace extension not detected—test every circuit invariant instantly without a wallet."
+      );
+    }
   };
 
   useEffect(() => {
@@ -534,10 +561,21 @@ export default function LeaseProofWorkspace() {
           </Link>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span className="badge badge-ok tabular">
+            <span className="badge badge-ok tabular hide-mobile">
               {snapshot.totalVerifiedPasses} Verified{" "}
               {snapshot.totalVerifiedPasses === 1 ? "Pass" : "Passes"}
             </span>
+            <button
+              type="button"
+              className={laceWallet?.connected ? "btn-primary" : "btn-ghost"}
+              onClick={handleConnectLace}
+              title="Connect Midnight Lace Wallet (DApp Connector API)"
+            >
+              <Wallet size={14} />
+              {laceWallet?.connected && laceWallet.address
+                ? shortMidnightAddr(laceWallet.address)
+                : "Connect Lace"}
+            </button>
             <Link href="/deck" className="btn-ghost hide-mobile">
               <Presentation size={15} /> Pitch Deck
             </Link>

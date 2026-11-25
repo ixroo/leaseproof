@@ -58,14 +58,16 @@ Run `npm test` to execute **17 Vitest unit & adversarial tests** proving the har
 
 ## CI Compilation & Local Setup
 
-- **GitHub Actions Linux CI (`.github/workflows/compact-ci.yml`):** Automatically installs the official Midnight `compact` compiler on Ubuntu Linux, compiles `contracts/leaseproof.compact`, and runs `npm test`, `npm run lint`, and `npm run build` on every push.
+- **GitHub Actions Linux CI (`.github/workflows/compact-ci.yml`):** Automatically installs the official Midnight `compact` compiler (`0.36.1`) on Ubuntu Linux, compiles `contracts/leaseproof.compact`, executes **real compiled-circuit runtime tests** (`contracts/witnesses.ts` + `contracts/__tests__/compiled-circuit.test.ts` on `@midnight-ntwrk/compact-runtime`), and runs `npm test`, `npm run lint`, and `npm run build` on every push.
+- **Midnight Lace Wallet DApp Connector (`src/lib/midnight/laceWallet.ts`):** Detects and connects `window.midnight.mnLace` in `/app` while keeping walletless verification (`/verify`) and transparent sandbox testing 100% frictionless.
 
 ```bash
 npm install
-npm test        # 17 unit & hardened adversarial ZK tests (Vitest)
-npm run lint    # ESLint (0 warnings)
-npm run build   # Next.js production build
-npm run dev     # Start local dev server
+npm test          # 17 unit & hardened adversarial ZK tests (Vitest)
+npm run test:compact  # Real compiled Compact circuit tests (runs after `compact compile` on Linux CI)
+npm run lint      # ESLint (0 warnings)
+npm run build     # Next.js production build
+npm run dev       # Start local dev server
 ```
 
 ---
