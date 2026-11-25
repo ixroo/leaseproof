@@ -460,6 +460,9 @@ body {
   font-size: 14px;
   background: var(--surface-2);
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: border-color 160ms var(--ease-out);
 }
 

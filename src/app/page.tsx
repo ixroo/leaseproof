@@ -294,9 +294,9 @@ export default function LandingPage() {
             <div className="grid-3">
               <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 18 }}>
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
                     <span className="badge badge-ok">Landlords &amp; Brokers</span>
-                    <strong className="tabular" style={{ fontSize: 18 }}>$0 Forever</strong>
+                    <strong className="tabular" style={{ fontSize: 17, whiteSpace: "nowrap" }}>$0 Forever</strong>
                   </div>
                   <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Walletless Instant Verifier</h3>
                   <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)", lineHeight: 1.6 }}>
@@ -311,9 +311,9 @@ export default function LandingPage() {
 
               <div className="card" style={{ borderColor: "rgba(124, 92, 255, 0.45)", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 18 }}>
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
                     <span className="badge badge-violet">Active Renters</span>
-                    <strong className="tabular" style={{ fontSize: 18, color: "#c4b5fd" }}>$1.99 / 30d</strong>
+                    <strong className="tabular" style={{ fontSize: 17, color: "#c4b5fd", whiteSpace: "nowrap" }}>$1.99 / 30d</strong>
                   </div>
                   <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Reusable Multi-Listing Pass</h3>
                   <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)", lineHeight: 1.6 }}>
@@ -328,9 +328,9 @@ export default function LandingPage() {
 
               <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 18 }}>
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
                     <span className="badge badge-cyan">Property Portals</span>
-                    <strong className="tabular" style={{ fontSize: 18 }}>B2B Portal API</strong>
+                    <strong className="tabular" style={{ fontSize: 17, whiteSpace: "nowrap" }}>B2B Portal API</strong>
                   </div>
                   <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Embedded Pre-Qual Badge</h3>
                   <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)", lineHeight: 1.6 }}>
