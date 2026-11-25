@@ -66,22 +66,22 @@ const SLIDES = [
   },
   {
     num: "07",
-    tag: "Incentive-Aligned Unit Economics",
-    title: "Aligned with Real Rental Market Incentives: Free for Landlords, $1.99 Reusable Pass for Renters.",
+    tag: "Why Web2 Substitutes Fail & Incentive-Aligned Unit Economics",
+    title: "Why Web2 Screening Fails Both Sides — And How LeaseProof Gets Paid.",
     points: [
+      "Why Web2 Fails: WhatsApp PDFs are trivial to Photoshop (84.3% fraud); Web2 portals (Snappt/Zillow) still centralize raw bank PDFs, violate GDPR minimization, and charge renters $35–$50 per single listing.",
       "$0 Forever for Landlords & Brokers: walletless off-chain verifier removes adoption friction and eliminates GDPR PDF storage liability.",
-      "$1.99 / 30-Day Reusable Tenant Pass (First Pass Free): covers Plaid/Tink Open Banking attestation cost once and replaces $35–$50 per-application fees across 20+ listings.",
-      "B2B Portal API: embedded Pre-Qualified badge for property portals & co-living marketplaces subsidizing API costs to filter broker spam.",
+      "$1.99 / 30-Day Reusable Tenant Pass (First Pass Free): covers Plaid/Tink Open Banking attestation cost once and replaces $35–$50 per-application fees across 20+ listings, plus B2B Portal API for co-living marketplaces.",
     ],
   },
   {
     num: "08",
-    tag: "Roadmap & Midnight Ecosystem Attribution",
-    title: "From Wave 3 Hardened MVP to Production Midnight Preprod Rails.",
+    tag: "Team, Grant Ask & Wave 4–5 Roadmap",
+    title: "Solo Full-Stack ZK Builder · Clear Pilot Ask · Production Midnight Preprod Path.",
     points: [
-      "Wave 3 (Shipped): Hardened Compact contract compiled on Ubuntu Linux CI, 17 automated unit & adversarial tests, 3-role transparent browser sandbox, walletless /verify pass.",
-      "Milestone 1 (Preprod): Deploy contracts/leaseproof.compact to Midnight Preprod with Lace wallet + real Plaid/Tink webhook attester calling anchorAttestation().",
-      "Milestone 2 (Mainnet): Co-signer household income aggregation circuit & zero-knowledge eviction-free attestation rail.",
+      "Builder: Independent Web3 & full-stack product builder (@Szoool · github.com/ixroo) shipping end-to-end Compact smart contracts, automated CI/runtime test suites, and consumer-grade Next.js interfaces.",
+      "Wave 3 / Wave 4 Grant Ask: Funding covers Plaid/Tink EU Open Banking sandbox & production webhook infrastructure, Midnight Preprod testnet deployment with Lace Wallet + Proof Server, and onboarding 3–5 independent co-living/letting agency pilot partners.",
+      "Shipped Today (Wave 3): Hardened Compact 0.36.1 contract compiled & executed on Ubuntu Linux CI (contracts/witnesses.ts + @midnight-ntwrk/compact-runtime), 17 adversarial tests, Lace Wallet DApp Connector + Walletless /verify pass.",
     ],
   },
 ];

@@ -72,6 +72,21 @@ npm run dev       # Start local dev server
 
 ---
 
+## Why Web2 Substitutes Fail vs. LeaseProof (Midnight ZK)
+
+| Approach | Stops Fake PDFs? | Tenant Keeps Salary/Balance Private? | Reusable Across 20 Listings? | Landlord Cost & Wallet Friction |
+| :--- | :---: | :---: | :---: | :--- |
+| **Email / WhatsApp PDFs** | No (84.3% fraud vector) | No (raw PDFs leaked to 20 brokers) | Yes, but leaks data every time | High GDPR breach liability |
+| **Web2 Screening Portals (Zillow / Snappt)** | Partial (document forensics) | No (centralized bank PDF storage) | No (`$35–$50` per listing) | High fees & centralized honeypot |
+| **LeaseProof (Midnight Compact ZK)** | **Yes (issuer-anchored on-ledger)** | **Yes (local private witnesses only)** | **Yes (`$1.99 / 30d` reusable pass)** | **`$0 Forever` · True Walletless Verifier** |
+
+## Builder & Pilot Ask
+
+- **Builder:** Independent full-stack & ZK product builder (`@Szoool` · [`github.com/ixroo`](https://github.com/ixroo))
+- **Wave 3 / Wave 4 Ask:** Grant support funds live Midnight Preprod deployment with Lace Wallet & Proof Server, Plaid/Tink EU webhook attester infrastructure (`anchorAttestation()`), and pilot onboarding with 3–5 co-living operators and independent letting agencies.
+
+---
+
 ## License & Ecosystem Attribution
 
 - **License:** [Apache-2.0](./LICENSE)
