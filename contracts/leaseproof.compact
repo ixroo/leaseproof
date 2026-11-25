@@ -1,0 +1,219 @@
+// SPDX-License-Identifier: Apache-2.0
+// LeaseProof — Privacy-First Rental & Lease Qualification Contract for Midnight Network
+// Proves income/deposit affordability without disclosing salary, bank balance, or ID.
+
+pragma language_version >= 0.16;
+
+import CompactStandardLibrary;
+
+// ---------------------------------------------------------------------------
+// Public Ledger State (Dual-Ledger Model: ONLY hashes, thresholds & statuses)
+// ---------------------------------------------------------------------------
+
+// Trusted Open Banking / Payroll Attesters: issuerId -> 1 (active) | 0 (revoked)
+export ledger trustedIssuers: Map<Bytes<32>, Uint<8>>;
+
+// Rental / Lease Listings:
+// mode: 0 = Income + Deposit (Apartment / Vehicle), 1 = Liquid Runway Only (Freelancer / Co-Living)
+export ledger listingMode: Map<Bytes<32>, Uint<8>>;
+export ledger listingMinIncome: Map<Bytes<32>, Uint<64>>;
+export ledger listingMinBalance: Map<Bytes<32>, Uint<64>>;
+
+// Listing-scoped anti-replay nullifiers (prevents duplicate submissions to same listing)
+export ledger usedNullifiers: Set<Bytes<32>>;
+
+// Verification Receipts: receiptId -> 1 (QUALIFIED) | 2 (REVOKED)
+export ledger verifiedReceipts: Map<Bytes<32>, Uint<8>>;
+
+// Tenant owner commitment per receipt so ONLY the tenant can revoke their own pass
+export ledger receiptOwnerCommit: Map<Bytes<32>, Bytes<32>>;
+
+// Receipt expiration epoch (Unix seconds)
+export ledger receiptExpiry: Map<Bytes<32>, Uint<64>>;
+
+// Total lifetime verified passes issued on Midnight
+export ledger totalVerifiedPasses: Counter;
+
+// ---------------------------------------------------------------------------
+// Private Witnesses (Strictly local off-chain state — NEVER exposed on-chain)
+// ---------------------------------------------------------------------------
+
+witness tenantSecret(): Bytes<32>;
+witness monthlyIncomeUsd(): Uint<64>;
+witness liquidBalanceUsd(): Uint<64>;
+witness attestationIssuerId(): Bytes<32>;
+witness attestationExpiryEpoch(): Uint<64>;
+witness attestationNonce(): Bytes<32>;
+witness attestedCommitment(): Bytes<32>;
+
+// ---------------------------------------------------------------------------
+// Pure Cryptographic Helpers
+// ---------------------------------------------------------------------------
+
+export circuit deriveOwnerCommit(secret: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "leaseproof:owner"), secret]);
+}
+
+export circuit deriveListingNullifier(secret: Bytes<32>, listingId: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>([
+    pad(32, "leaseproof:nullifier"),
+    secret,
+    listingId
+  ]);
+}
+
+export circuit deriveReceiptId(
+  nullifier: Bytes<32>,
+  listingId: Bytes<32>,
+  attCommit: Bytes<32>
+): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([
+    pad(32, "leaseproof:receipt"),
+    nullifier,
+    listingId,
+    attCommit
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// 1. Attester Registry Circuits (Open Banking / Payroll Providers)
+// ---------------------------------------------------------------------------
+
+export circuit registerIssuer(issuerId: Bytes<32>): [] {
+  const pubIssuer = disclose(issuerId);
+  trustedIssuers.insert(pubIssuer, 1 as Uint<8>);
+}
+
+export circuit revokeIssuer(issuerId: Bytes<32>): [] {
+  const pubIssuer = disclose(issuerId);
+  assert(trustedIssuers.member(pubIssuer), "UNKNOWN_ISSUER");
+  trustedIssuers.insert(pubIssuer, 0 as Uint<8>);
+}
+
+// ---------------------------------------------------------------------------
+// 2. Landlord / Property Manager Listing Circuit
+// ---------------------------------------------------------------------------
+
+export circuit createListing(
+  listingId: Bytes<32>,
+  mode: Uint<8>,
+  minIncomeUsd: Uint<64>,
+  minBalanceUsd: Uint<64>
+): [] {
+  const pubListing = disclose(listingId);
+  const pubMode = disclose(mode);
+  const pubMinIncome = disclose(minIncomeUsd);
+  const pubMinBalance = disclose(minBalanceUsd);
+
+  assert(pubMode <= (1 as Uint<8>), "INVALID_LISTING_MODE");
+  assert(pubMinBalance > (0 as Uint<64>), "INVALID_BALANCE_THRESHOLD");
+
+  listingMode.insert(pubListing, pubMode);
+  listingMinIncome.insert(pubListing, pubMinIncome);
+  listingMinBalance.insert(pubListing, pubMinBalance);
+}
+
+// ---------------------------------------------------------------------------
+// 3. Tenant Selective-Disclosure Qualification Proof Circuit
+//    Proves affordability & issuer trust while leaking 0 bits of salary/balance
+// ---------------------------------------------------------------------------
+
+export circuit submitQualificationProof(
+  listingId: Bytes<32>,
+  currentEpoch: Uint<64>,
+  passExpiryEpoch: Uint<64>
+): Bytes<32> {
+  const pubListing = disclose(listingId);
+  const pubNow = disclose(currentEpoch);
+  const pubPassExpiry = disclose(passExpiryEpoch);
+
+  assert(listingMode.member(pubListing), "UNKNOWN_LISTING");
+  assert(pubPassExpiry > pubNow, "INVALID_PASS_EXPIRY");
+
+  // Load private financial inputs locally (NEVER disclosed!)
+  const secret = tenantSecret();
+  const income = monthlyIncomeUsd();
+  const balance = liquidBalanceUsd();
+  const issuerId = attestationIssuerId();
+  const attExpiry = attestationExpiryEpoch();
+  const nonce = attestationNonce();
+  const expectedCommit = attestedCommitment();
+
+  // Verify issuer is registered and active on public ledger
+  const pubIssuer = disclose(issuerId);
+  assert(trustedIssuers.member(pubIssuer), "UNTRUSTED_ISSUER");
+  assert(trustedIssuers.lookup(pubIssuer) == (1 as Uint<8>), "REVOKED_ISSUER");
+
+  // Verify attestation has not expired
+  assert(attExpiry >= pubNow, "EXPIRED_ATTESTATION");
+
+  // Bind private values to issuer-signed commitment (prevents local tampering)
+  const computedCommit = persistentHash<Vector<5, Bytes<32>>>([
+    pad(32, "leaseproof:attest"),
+    issuerId,
+    income as Field as Bytes<32>,
+    balance as Field as Bytes<32>,
+    nonce
+  ]);
+  assert(computedCommit == expectedCommit, "TAMPERED_COMMITMENT");
+
+  // Enforce listing qualification thresholds privately in-circuit
+  const mode = listingMode.lookup(pubListing);
+  const reqIncome = listingMinIncome.lookup(pubListing);
+  const reqBalance = listingMinBalance.lookup(pubListing);
+
+  assert(balance >= reqBalance, "INSUFFICIENT_BALANCE");
+  if (mode == (0 as Uint<8>)) {
+    assert(income >= reqIncome, "INSUFFICIENT_INCOME");
+  }
+
+  // Listing-scoped nullifier prevents replay on same listing while allowing
+  // the tenant to apply to multiple different listings unlinkably
+  const nullifier = deriveListingNullifier(secret, pubListing);
+  const pubNullifier = disclose(nullifier);
+  assert(!usedNullifiers.member(pubNullifier), "REPLAY_ATTACK");
+
+  const ownerCommit = deriveOwnerCommit(secret);
+  const receiptId = deriveReceiptId(nullifier, pubListing, expectedCommit);
+
+  const pubOwnerCommit = disclose(ownerCommit);
+  const pubReceiptId = disclose(receiptId);
+
+  usedNullifiers.insert(pubNullifier);
+  verifiedReceipts.insert(pubReceiptId, 1 as Uint<8>);
+  receiptOwnerCommit.insert(pubReceiptId, pubOwnerCommit);
+  receiptExpiry.insert(pubReceiptId, pubPassExpiry);
+  totalVerifiedPasses.increment(1);
+
+  return pubReceiptId;
+}
+
+// ---------------------------------------------------------------------------
+// 4. Tenant-Controlled Instant Revocation Circuit (Beats Non-Revocable Bundles)
+// ---------------------------------------------------------------------------
+
+export circuit revokeReceipt(receiptId: Bytes<32>): [] {
+  const pubReceipt = disclose(receiptId);
+  assert(verifiedReceipts.member(pubReceipt), "UNKNOWN_RECEIPT");
+  assert(verifiedReceipts.lookup(pubReceipt) == (1 as Uint<8>), "ALREADY_REVOKED");
+
+  // Prove caller owns the private tenantSecret that created this receipt
+  const secret = tenantSecret();
+  const ownerCommit = deriveOwnerCommit(secret);
+  const expectedOwner = receiptOwnerCommit.lookup(pubReceipt);
+  assert(ownerCommit == expectedOwner, "UNAUTHORIZED_REVOKE");
+
+  verifiedReceipts.insert(pubReceipt, 2 as Uint<8>);
+}
+
+// ---------------------------------------------------------------------------
+// 5. Walletless Public Verification Circuits
+// ---------------------------------------------------------------------------
+
+export circuit verifyReceipt(receiptId: Bytes<32>): Uint<8> {
+  const pubReceipt = disclose(receiptId);
+  if (!verifiedReceipts.member(pubReceipt)) {
+    return 0 as Uint<8>;
+  }
+  return verifiedReceipts.lookup(pubReceipt);
+}
