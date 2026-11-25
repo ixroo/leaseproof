@@ -658,10 +658,10 @@ export default function LeaseProofWorkspace() {
                       )}
                     </div>
 
-                    <div className="grid-2">
+                    <div className="grid-2" style={{ alignItems: "end" }}>
                       <div>
                         <label className="field-label" htmlFor="issuer-select">
-                          Trusted Attester (Anchors Commitment On-Chain)
+                          Verified Bank / Payroll Attester
                         </label>
                         <select
                           id="issuer-select"
@@ -678,7 +678,7 @@ export default function LeaseProofWorkspace() {
                       </div>
                       <div>
                         <label className="field-label" htmlFor="currency-select">
-                          Attestation Currency (ISO-4217)
+                          Currency (ISO-4217)
                         </label>
                         <select
                           id="currency-select"
@@ -693,7 +693,7 @@ export default function LeaseProofWorkspace() {
                       </div>
                     </div>
 
-                    <div className="grid-2">
+                    <div className="grid-2" style={{ alignItems: "end" }}>
                       <div>
                         <label className="field-label" htmlFor="income-input">
                           Private Monthly Income ({CURRENCY_META[currencyCode].code})
@@ -720,10 +720,10 @@ export default function LeaseProofWorkspace() {
                       </div>
                     </div>
 
-                    <div className="grid-2">
+                    <div className="grid-2" style={{ alignItems: "end" }}>
                       <div>
                         <label className="field-label" htmlFor="kyc-input">
-                          Attester KYC Identity Seed (Anti-Straw-Applicant)
+                          Identity Binding Seed
                         </label>
                         <input
                           id="kyc-input"
@@ -735,7 +735,7 @@ export default function LeaseProofWorkspace() {
                       </div>
                       <div>
                         <label className="field-label" htmlFor="secret-input">
-                          Tenant Revocation Secret
+                          Pass Revocation Secret
                         </label>
                         <input
                           id="secret-input"
@@ -840,7 +840,7 @@ export default function LeaseProofWorkspace() {
 
                 {activeReceipt && (
                   <div
-                    className="card"
+                    className="viewing-pass-card"
                     style={{
                       borderColor:
                         activeReceipt.status === 2
@@ -856,7 +856,8 @@ export default function LeaseProofWorkspace() {
                         justifyContent: "space-between",
                         alignItems: "center",
                         gap: 8,
-                        marginBottom: 10,
+                        flexWrap: "wrap",
+                        marginBottom: 12,
                       }}
                     >
                       <span
@@ -864,7 +865,7 @@ export default function LeaseProofWorkspace() {
                           activeReceipt.status === 2
                             ? "badge-danger"
                             : activeIsExpired
-                            ? "badge-neutral"
+                            ? "badge-warn"
                             : "badge-ok"
                         }`}
                       >
@@ -874,13 +875,19 @@ export default function LeaseProofWorkspace() {
                           ? "EXPIRED (14D WINDOW ENDED)"
                           : "VERIFIED QUALIFIED · ACTIVE"}
                       </span>
-                      <span className="mono" style={{ fontSize: 11.5, color: "var(--muted)" }}>
+                      <span className="mono" style={{ fontSize: 11.5, color: "var(--muted)", whiteSpace: "nowrap" }}>
                         14d fixed validity
                       </span>
                     </div>
 
-                    <h3 style={{ margin: "0 0 6px", fontSize: 17 }}>{activeReceipt.listingTitle}</h3>
-                    <div className="mono" style={{ fontSize: 12, color: "var(--cyan)", marginBottom: 14, wordBreak: "break-all" }}>
+                    <h3 style={{ margin: "0 0 4px", fontSize: 18 }}>{activeReceipt.listingTitle}</h3>
+                    <div style={{ fontSize: 13, color: "var(--muted)" }}>
+                      Verified by {activeReceipt.issuerName} · Listing-locked pass
+                    </div>
+
+                    <hr className="pass-divider" />
+
+                    <div className="mono" style={{ fontSize: 11.5, color: "var(--cyan)", marginBottom: 14, wordBreak: "break-all" }}>
                       Receipt: {activeReceipt.receiptId}
                     </div>
 
@@ -951,7 +958,10 @@ export default function LeaseProofWorkspace() {
                         id="verify-listing-select"
                         className="input-dark"
                         value={verifyExpectedListingId}
-                        onChange={(e) => setVerifyExpectedListingId(e.target.value)}
+                        onChange={(e) => {
+                          setVerifyExpectedListingId(e.target.value);
+                          setVerifiedLookup(null);
+                        }}
                       >
                         {snapshot.listings.map((l) => (
                           <option key={l.id} value={l.id}>
@@ -1084,7 +1094,7 @@ export default function LeaseProofWorkspace() {
                       onChange={(e) => setNewListingTitle(e.target.value)}
                     />
                   </div>
-                  <div className="grid-3">
+                  <div className="grid-3" style={{ alignItems: "end" }}>
                     <div>
                       <label className="field-label" htmlFor="new-loc">City</label>
                       <input
@@ -1103,8 +1113,8 @@ export default function LeaseProofWorkspace() {
                         value={newListingMode}
                         onChange={(e) => setNewListingMode(Number(e.target.value) as ListingMode)}
                       >
-                        <option value={0}>0 · Income + Deposit</option>
-                        <option value={1}>1 · Runway Only</option>
+                        <option value={0}>Income + Deposit</option>
+                        <option value={1}>Runway Only</option>
                       </select>
                     </div>
                     <div>
@@ -1121,7 +1131,7 @@ export default function LeaseProofWorkspace() {
                       </select>
                     </div>
                   </div>
-                  <div className="grid-3">
+                  <div className="grid-3" style={{ alignItems: "end" }}>
                     <div>
                       <label className="field-label" htmlFor="new-rent">Rent / mo</label>
                       <input
@@ -1262,31 +1272,41 @@ export default function LeaseProofWorkspace() {
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        gap: 10,
-                        flexWrap: "wrap",
+                        gap: 12,
+                        minHeight: 72,
                       }}
                     >
-                      <div>
-                        <strong style={{ fontSize: 14 }}>{iss.name}</strong>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <strong
+                          style={{
+                            fontSize: 14,
+                            display: "block",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {iss.name}
+                        </strong>
                         <div style={{ fontSize: 12, color: "var(--muted)" }}>
                           {iss.providerType} · <span className="mono">{iss.id}</span>
                         </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                         <span className={`badge ${iss.active ? "badge-ok" : "badge-danger"}`}>
                           {iss.active ? "ACTIVE" : "REVOKED"}
                         </span>
                         <button
                           type="button"
                           className={iss.active ? "btn-danger" : "btn-ghost"}
-                          style={{ padding: "6px 12px", fontSize: 12 }}
+                          style={{ padding: "6px 12px", fontSize: 12, whiteSpace: "nowrap" }}
                           onClick={() => {
                             if (iss.active) engine.revokeIssuer(iss.id, DEFAULT_ADMIN_SECRET);
                             else engine.reinstateIssuer(iss.id, DEFAULT_ADMIN_SECRET);
                             syncLedger();
                           }}
                         >
-                          {iss.active ? "Revoke (Admin)" : "Reinstate (Admin)"}
+                          {iss.active ? "Revoke" : "Reinstate"}
                         </button>
                       </div>
                     </div>

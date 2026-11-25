@@ -99,31 +99,47 @@ export default function PitchDeckPage() {
             <span className="nav-divider">|</span>
             <span className="nav-sub">8-Slide Pitch Deck</span>
           </Link>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
             <Link href="/app" className="btn-ghost">
-              <ArrowLeft size={14} /> Open Workspace
+              <ArrowLeft size={14} />
+              <span className="hide-xs">Open Workspace</span>
+              <span className="show-xs">App</span>
             </Link>
             <button type="button" className="btn-primary" onClick={() => window.print()}>
-              <Printer size={15} /> Print / Save PDF
+              <Printer size={15} />
+              <span className="hide-xs">Print / Save PDF</span>
+              <span className="show-xs">Print</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="container" style={{ padding: "36px 24px 72px", display: "grid", gap: 22 }}>
+      <main className="container" style={{ padding: "32px 20px 72px", display: "grid", gap: 22 }}>
         {SLIDES.map((s) => (
           <article
             key={s.num}
             className="card"
             style={{
-              padding: "36px 38px",
+              padding: "clamp(20px, 4vw, 38px)",
               pageBreakAfter: "always",
               borderColor: "var(--border-strong)",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 10,
+                marginBottom: 14,
+              }}
+            >
               <span className="badge badge-violet">{s.tag}</span>
-              <span className="mono" style={{ fontSize: 13, color: "var(--muted)" }}>
+              <span
+                className="mono"
+                style={{ fontSize: 12.5, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}
+              >
                 SLIDE {s.num} / 08
               </span>
             </div>
