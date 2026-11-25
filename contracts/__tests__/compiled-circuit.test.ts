@@ -33,7 +33,16 @@ const COMPILED_CONTRACT_PATH = path.resolve(
 const HAS_COMPILED_ARTIFACT = existsSync(COMPILED_CONTRACT_PATH);
 const IS_CI = process.env.CI === "true";
 
+const vec2Bytes32 = new CompactTypeVector(2, new CompactTypeBytes(32));
 const vec8Bytes32 = new CompactTypeVector(8, new CompactTypeBytes(32));
+
+function computeAdminCommit(secret: Uint8Array): Uint8Array {
+  return persistentHash(vec2Bytes32, [padBytes32("leaseproof:admin"), secret]);
+}
+
+function computeIssuerKeyCommit(secret: Uint8Array): Uint8Array {
+  return persistentHash(vec2Bytes32, [padBytes32("leaseproof:issuer"), secret]);
+}
 
 function computeCompactAttestationCommit(params: {
   issuerId: Uint8Array;
@@ -88,13 +97,12 @@ describe("Compiled Midnight Compact Contract (contracts/leaseproof.compact)", ()
     const initialEpoch = BigInt(1_795_600_000);
     const validAttExpiry = initialEpoch + BigInt(86_400) * BigInt(30);
 
-    // Pure circuit derivations on the compiled Compact contract
-    const adminCommit: Uint8Array = contract.circuits.deriveAdminCommit(adminSecret);
-    const issuerKeyCommit: Uint8Array = contract.circuits.deriveIssuerKeyCommit(issuerSecret);
+    const adminCommit = computeAdminCommit(adminSecret);
+    const issuerKeyCommit = computeIssuerKeyCommit(issuerSecret);
 
     // 1. Deploy via constructor(initialAdminCommit, initialEpoch)
     let privateState: LeaseProofPrivateState = createInitialPrivateState({ adminSecret });
-    const initResult = contract.initialState(
+    const initResult = await contract.initialState(
       createConstructorContext(privateState, coinPublicKey),
       adminCommit,
       initialEpoch
@@ -103,7 +111,7 @@ describe("Compiled Midnight Compact Contract (contracts/leaseproof.compact)", ()
     let zswapState = initResult.currentZswapLocalState;
     privateState = initResult.currentPrivateState;
 
-    const callCircuit = (
+    const callCircuit = async (
       circuitId: string,
       ps: LeaseProofPrivateState,
       ...args: unknown[]
@@ -115,47 +123,47 @@ describe("Compiled Midnight Compact Contract (contracts/leaseproof.compact)", ()
         contractState: currentState,
         privateState: ps,
       });
-      const res = contract.impureCircuits[circuitId](ctx, ...args);
+      const res = await contract.impureCircuits[circuitId](ctx, ...args);
       currentState = res.context.callContext.currentQueryContext.state;
       zswapState = res.context.callContext.currentZswapLocalState ?? zswapState;
       return res;
     };
 
+    const readLedger = () => ledger(currentState.data ?? currentState);
+
     // Check initial ledger state
-    const initialLedger = ledger(currentState.data ?? currentState);
-    expect(initialLedger.currentLedgerEpoch).toBe(initialEpoch);
+    expect(readLedger().currentLedgerEpoch).toBe(initialEpoch);
 
     // 2. Reject UNAUTHORIZED_ADMIN on registerIssuer
-    expect(() =>
+    await expect(
       callCircuit(
         "registerIssuer",
         createInitialPrivateState({ adminSecret: wrongAdminSecret }),
         issuerId,
         issuerKeyCommit
       )
-    ).toThrow(/UNAUTHORIZED_ADMIN/);
+    ).rejects.toThrow(/UNAUTHORIZED_ADMIN/);
 
     // 3. Admin registers Argyle issuer
-    callCircuit(
+    await callCircuit(
       "registerIssuer",
       createInitialPrivateState({ adminSecret }),
       issuerId,
       issuerKeyCommit
     );
-    const afterRegister = ledger(currentState.data ?? currentState);
-    expect(afterRegister.trustedIssuers.lookup(issuerId)).toBe(BigInt(1));
+    expect(readLedger().trustedIssuers.lookup(issuerId)).toBe(BigInt(1));
 
     // 4. Reject EPOCH_CANNOT_GO_BACKWARD on advanceEpoch
-    expect(() =>
+    await expect(
       callCircuit(
         "advanceEpoch",
         createInitialPrivateState({ adminSecret }),
         initialEpoch - BigInt(10)
       )
-    ).toThrow(/EPOCH_CANNOT_GO_BACKWARD/);
+    ).rejects.toThrow(/EPOCH_CANNOT_GO_BACKWARD/);
 
     // 5. Create USD Apartment Listing (mode 0: minIncome=7200, minBalance=4800)
-    callCircuit(
+    await callCircuit(
       "createListing",
       privateState,
       listingId,
@@ -176,17 +184,17 @@ describe("Compiled Midnight Compact Contract (contracts/leaseproof.compact)", ()
       nonce,
     });
 
-    expect(() =>
+    await expect(
       callCircuit(
         "anchorAttestation",
         createInitialPrivateState({ issuerSecret: wrongIssuerSecret }),
         issuerId,
         honestCommit
       )
-    ).toThrow(/UNAUTHORIZED_ISSUER_KEY/);
+    ).rejects.toThrow(/UNAUTHORIZED_ISSUER_KEY/);
 
     // 7. Real issuer anchors attestation on public ledger
-    callCircuit(
+    await callCircuit(
       "anchorAttestation",
       createInitialPrivateState({ issuerSecret }),
       issuerId,
@@ -194,7 +202,7 @@ describe("Compiled Midnight Compact Contract (contracts/leaseproof.compact)", ()
     );
 
     // 8. Attack: Tenant inflates salary locally -> TAMPERED_COMMITMENT
-    expect(() =>
+    await expect(
       callCircuit(
         "submitQualificationProof",
         createInitialPrivateState({
@@ -210,10 +218,10 @@ describe("Compiled Midnight Compact Contract (contracts/leaseproof.compact)", ()
         listingId,
         BigInt(1)
       )
-    ).toThrow(/TAMPERED_COMMITMENT/);
+    ).rejects.toThrow(/TAMPERED_COMMITMENT/);
 
     // 9. Attack: Wrong currency (EUR 978 on USD 840 listing) -> CURRENCY_MISMATCH
-    expect(() =>
+    await expect(
       callCircuit(
         "submitQualificationProof",
         createInitialPrivateState({
@@ -229,7 +237,7 @@ describe("Compiled Midnight Compact Contract (contracts/leaseproof.compact)", ()
         listingId,
         BigInt(1)
       )
-    ).toThrow(/CURRENCY_MISMATCH/);
+    ).rejects.toThrow(/CURRENCY_MISMATCH/);
 
     // 10. Honest Tenant Proof Submission -> returns listing-bound receiptId & updates ledger
     const tenantPs = createInitialPrivateState({
@@ -242,17 +250,16 @@ describe("Compiled Midnight Compact Contract (contracts/leaseproof.compact)", ()
       attestationExpiryEpoch: validAttExpiry,
       attestationNonce: nonce,
     });
-    const proofRes = callCircuit("submitQualificationProof", tenantPs, listingId, BigInt(1));
+    const proofRes = await callCircuit("submitQualificationProof", tenantPs, listingId, BigInt(1));
     const receiptId: Uint8Array = proofRes.result;
     expect(receiptId).toBeInstanceOf(Uint8Array);
     expect(receiptId.length).toBe(32);
 
-    const afterProof = ledger(currentState.data ?? currentState);
-    expect(afterProof.verifiedReceipts.lookup(receiptId)).toBe(BigInt(1));
-    expect(afterProof.totalVerifiedPasses).toBe(BigInt(1));
+    expect(readLedger().verifiedReceipts.lookup(receiptId)).toBe(BigInt(1));
+    expect(readLedger().totalVerifiedPasses).toBe(BigInt(1));
 
     // 11. Attack: Replay with rotated tenantSecret in same window -> REPLAY_ATTACK
-    expect(() =>
+    await expect(
       callCircuit(
         "submitQualificationProof",
         createInitialPrivateState({
@@ -262,24 +269,23 @@ describe("Compiled Midnight Compact Contract (contracts/leaseproof.compact)", ()
         listingId,
         BigInt(1)
       )
-    ).toThrow(/REPLAY_ATTACK/);
+    ).rejects.toThrow(/REPLAY_ATTACK/);
 
     // 12. Attack: Stranger tries to revoke tenant's pass -> UNAUTHORIZED_REVOKE
-    expect(() =>
+    await expect(
       callCircuit(
         "revokeReceipt",
         createInitialPrivateState({ tenantSecret: strangerSecret }),
         receiptId
       )
-    ).toThrow(/UNAUTHORIZED_REVOKE/);
+    ).rejects.toThrow(/UNAUTHORIZED_REVOKE/);
 
     // 13. Honest Tenant revokes their own pass -> status flips to REVOKED (2)
-    callCircuit(
+    await callCircuit(
       "revokeReceipt",
       createInitialPrivateState({ tenantSecret }),
       receiptId
     );
-    const afterRevoke = ledger(currentState.data ?? currentState);
-    expect(afterRevoke.verifiedReceipts.lookup(receiptId)).toBe(BigInt(2));
+    expect(readLedger().verifiedReceipts.lookup(receiptId)).toBe(BigInt(2));
   });
 });
