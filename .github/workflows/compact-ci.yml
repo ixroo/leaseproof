@@ -27,6 +27,7 @@ jobs:
 
       - name: Verify Compact Version & Compile LeaseProof Contract
         run: |
+          compact update
           compact --version
           compact compile contracts/leaseproof.compact contracts/managed/leaseproof
 
