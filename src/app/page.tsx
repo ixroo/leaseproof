@@ -1,401 +1,438 @@
 import Link from "next/link";
-import {
-  ArrowUpRight,
-  Building2,
-  Car,
-  CheckCircle2,
-  Clock,
-  Code2,
-  EyeOff,
-  Laptop,
-  Lock,
-  Presentation,
-  ShieldCheck,
-} from "lucide-react";
+import { CheckCircle2, Code2, EyeOff, Lock, Presentation, ShieldCheck } from "lucide-react";
+import { NoirFlutedShader } from "@/components/NoirFlutedShader";
+import { TitaniumLeasePass3D } from "@/components/TitaniumLeasePass3D";
+import { BlueprintPeelSection } from "@/components/BlueprintPeelSection";
+import { VerticalShowcase } from "@/components/VerticalShowcase";
 
 export default function LandingPage() {
   return (
     <>
-      <header className="site-header">
+      <header className="site-header-noir">
         <div className="site-header-inner">
-          <Link href="/" className="brand-lockup">
-            <span className="brand-mark" aria-hidden="true">
-              <ShieldCheck size={18} strokeWidth={2.4} />
+          <Link href="/" className="brand-lockup" style={{ color: "var(--bone)" }}>
+            <span
+              className="brand-mark"
+              aria-hidden="true"
+              style={{
+                background: "linear-gradient(135deg, #f4f4f0, #a8b0ba)",
+                color: "#0e1014",
+              }}
+            >
+              <ShieldCheck size={17} strokeWidth={2.4} />
             </span>
             <span>LeaseProof</span>
-            <span className="nav-divider">|</span>
-            <span className="nav-sub">Private Rental Viewing Pass</span>
           </Link>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Link href="/deck" className="btn-ghost">
-              <Presentation size={15} />
-              <span className="hide-xs">Pitch Deck</span>
-              <span className="show-xs">Deck</span>
+          <nav className="nav-links" aria-label="Primary navigation">
+            <Link href="/app" className="nav-link hide-sm" style={{ color: "#c9cdd4" }}>
+              Workspace
             </Link>
-            <Link href="/app" className="btn-primary">
-              <span className="hide-xs">Open Workspace</span>
-              <span className="show-xs">Open App</span>
-              <ArrowUpRight size={15} />
+            <Link href="/verify" className="nav-link hide-sm" style={{ color: "#c9cdd4" }}>
+              Verify pass
             </Link>
-          </div>
+            <Link href="/deck" className="nav-link" style={{ color: "#c9cdd4" }}>
+              <Presentation size={14} />
+              <span className="hide-sm">Pitch deck</span>
+              <span className="show-sm">Deck</span>
+            </Link>
+            <Link href="/app" className="btn-liquid-glass" style={{ minHeight: 38, padding: "0 14px", fontSize: 13.5 }}>
+              <span className="hide-sm">Open workspace</span>
+              <span className="show-sm">Open app</span>
+            </Link>
+          </nav>
         </div>
       </header>
 
       <main>
-        {/* Human-First Hero + Visual Digital Viewing Pass */}
-        <section className="hero-section">
+        {/* HERO: Noir Fluted-Glass WebGL Shader + Cypress Editorial Type + Billet 3D Titanium Pass */}
+        <section className="noir-hero">
+          <NoirFlutedShader />
+
           <div className="container">
-            <div className="hero-split">
-              <div>
-                <span className="badge badge-violet reveal reveal-1" style={{ marginBottom: 18 }}>
-                  Private Rental Pre-Qualification · Powered by Midnight
-                </span>
-                <h1 className="display-xl reveal reveal-2">
-                  Book apartment viewings without sending your bank statements, payslips, or ID to
-                  20 brokers.
+            <div className="hero-grid">
+              <div style={{ display: "grid", gap: 22 }}>
+                <h1
+                  className="display-hero"
+                  style={{ color: "#9da4b0", fontWeight: 700 }}
+                >
+                  Qualify for viewings without sending{" "}
+                  <span style={{ color: "#f6f6f2" }}>bank PDFs to twenty brokers.</span>
                 </h1>
-                <p className="lead reveal reveal-3">
-                  Connect your bank or payroll once to generate a tamper-proof{" "}
-                  <strong style={{ color: "var(--text)" }}>Viewing Pass</strong>. Brokers confirm
-                  you meet the rent requirement in 3 seconds—while your exact salary, bank balance,
-                  and documents stay 100% private. Share your legal ID only with the single landlord
-                  you sign with.
+
+                <p
+                  className="lead-copy"
+                  style={{ color: "#b6bcc6", maxWidth: "46ch" }}
+                >
+                  Connect verified payroll or open banking once on Midnight. Issue a 14-day,
+                  listing-locked Viewing Pass that landlords verify wallet-free in three seconds—and
+                  revoke it with one click.
                 </p>
 
-                <div className="reveal reveal-4" style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                  <Link href="/app" className="btn-primary">
-                    Create Your Viewing Pass <ArrowUpRight size={16} />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, paddingTop: 4 }}>
+                  <Link href="/app" className="btn-liquid-glass">
+                    Issue Viewing Pass
                   </Link>
-                  <Link href="/app?tab=landlord" className="btn-ghost">
-                    Verify a Tenant Pass
+                  <Link href="/app?tab=landlord" className="btn-noir-ghost">
+                    Verify a tenant pass
                   </Link>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 22,
+                    paddingTop: 10,
+                    borderTop: "1px solid rgba(255, 255, 255, 0.11)",
+                    fontSize: 13.5,
+                    color: "#9da4b0",
+                  }}
+                >
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                    <span className="nav-active-dot" style={{ background: "#5eead4" }} />
+                    Zero raw salary disclosed
+                  </span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                    <span className="nav-active-dot" style={{ background: "#e8d5b7" }} />
+                    Walletless broker verification
+                  </span>
                 </div>
               </div>
 
-              {/* Clean Digital Boarding-Pass Style Focal Point */}
-              <div className="viewing-pass-card reveal reveal-3">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted)" }}>
-                    Viewing Pass Preview
-                  </span>
-                  <span className="badge badge-ok">
-                    <CheckCircle2 size={13} /> QUALIFIED
-                  </span>
-                </div>
-
-                <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
-                  SoHo Lofts · 1BR Apartment
-                </div>
-                <div style={{ fontSize: 13.5, color: "var(--muted)" }}>
-                  $2,400/mo · Verified via Argyle Payroll
-                </div>
-
-                <hr className="pass-divider" />
-
-                <div style={{ display: "grid", gap: 10, fontSize: 13.5 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                    <span style={{ color: "var(--muted)" }}>Income &amp; Deposit Check</span>
-                    <strong style={{ color: "var(--green)" }}>Meets 3× Rent Bar</strong>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                    <span style={{ color: "var(--muted)" }}>Salary / Bank PDFs Shared</span>
-                    <strong style={{ color: "var(--text)" }}>None (Private)</strong>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                    <span style={{ color: "var(--muted)" }}>Pass Validity</span>
-                    <strong style={{ color: "var(--cyan)", display: "inline-flex", alignItems: "center", gap: 5 }}>
-                      <Clock size={13} /> 14 Days · Revocable
-                    </strong>
-                  </div>
-                </div>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <TitaniumLeasePass3D />
               </div>
             </div>
+          </div>
+        </section>
 
-            {/* Real Industry Pain Strip */}
-            <div className="grid-4" style={{ marginTop: 48 }}>
-              <div className="card">
-                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>
-                  Landlords Hit by Fraud
-                </div>
-                <strong className="tabular" style={{ fontSize: 30, color: "#f87171" }}>
-                  93.3%
-                </strong>
-                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
-                  Experienced application fraud in 12 mos (NMHC)
+        {/* BARE-CANVAS HAIRLINE DATA STRIP (Real NMHC & Snappt Evidence — Zero Boxed Metric Cards) */}
+        <section style={{ padding: "56px 0", borderBottom: "1px solid var(--rule)" }}>
+          <div className="container">
+            <div className="metric-strip">
+              <div className="metric-cell">
+                <strong className="metric-figure tabular">93.3%</strong>
+                <div className="metric-title">Rental providers hit by fraud</div>
+                <div className="metric-note">
+                  Experienced application fraud in the past 12 months (NMHC Pulse Survey)
                 </div>
               </div>
-              <div className="card">
-                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>
-                  Fake Pay Stubs &amp; Bank PDFs
-                </div>
-                <strong className="tabular" style={{ fontSize: 30, color: "var(--amber)" }}>
-                  84.3%
-                </strong>
-                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
-                  Up to 1 in 8 rental apps contain doctored PDFs (Snappt)
+              <div className="metric-cell">
+                <strong className="metric-figure tabular">84.3%</strong>
+                <div className="metric-title">Doctored pay stubs &amp; bank PDFs</div>
+                <div className="metric-note">
+                  Up to 1 in 8 rental applications contain forged income documents (Snappt)
                 </div>
               </div>
-              <div className="card">
-                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>
-                  GDPR Data Minimization
-                </div>
-                <strong className="tabular" style={{ fontSize: 30, color: "var(--cyan)" }}>
+              <div className="metric-cell">
+                <strong className="metric-figure tabular" style={{ color: "var(--teal)" }}>
                   Art. 5(1)(c)
                 </strong>
-                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
-                  Brokers hold zero sensitive PDFs during viewings
+                <div className="metric-title">GDPR data minimization</div>
+                <div className="metric-note">
+                  Agencies hold zero unencrypted tenant PDFs during apartment viewings
                 </div>
               </div>
-              <div className="card" style={{ borderColor: "rgba(16, 185, 129, 0.35)" }}>
-                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>
-                  Documents Shared to Brokers
-                </div>
-                <strong className="tabular" style={{ fontSize: 30, color: "var(--green)" }}>
-                  Zero PDFs
+              <div className="metric-cell">
+                <strong className="metric-figure tabular" style={{ color: "var(--teal)" }}>
+                  0 PDFs
                 </strong>
-                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
-                  Only a verified pass—never your exact salary or balance
+                <div className="metric-title">Documents sprayed to brokers</div>
+                <div className="metric-note">
+                  Share legal ID only once with the single landlord you actually sign with
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* 3 Everyday Rental Verticals */}
-        <section style={{ padding: "64px 0", borderBottom: "1px solid var(--border)" }}>
+        {/* SIGNATURE INTERACTIVE SECTION: PEELABLE ARCHITECTURAL FLOOR-PLAN & ZK BLUEPRINT */}
+        <section className="section-band">
           <div className="container">
-            <div style={{ marginBottom: 28 }}>
-              <span className="badge badge-cyan" style={{ marginBottom: 10 }}>
-                Three Everyday Rental Scenarios
-              </span>
-              <h2 className="display-md">Works Whether You Are Salaried, Freelance, or Leasing a Car</h2>
-              <p className="prose" style={{ margin: 0, fontSize: 15, color: "var(--muted)", lineHeight: 1.6 }}>
-                Every pass is locked to a single listing, verified in the listing&apos;s exact
-                currency, and automatically expires after 14 days so your data never lingers.
+            <BlueprintPeelSection />
+          </div>
+        </section>
+
+        {/* INTERACTIVE VERTICAL SWITCHER (Salaried / Freelancer Runway / Vehicle Lease) */}
+        <section className="section-band">
+          <div className="container">
+            <VerticalShowcase />
+          </div>
+        </section>
+
+        {/* TWO-COLUMN ARCHITECTURAL PRIVACY LEDGER (Bare Canvas Hairlines) */}
+        <section className="section-band">
+          <div className="container">
+            <div style={{ maxWidth: 620, marginBottom: 36 }}>
+              <h2 className="display-section" style={{ marginBottom: 10 }}>
+                What brokers verify versus what stays sealed on your device.
+              </h2>
+              <p className="lead-copy">
+                Zero nested dashboards. Clear separation between verifiable rental certainty and
+                your personal finances.
+              </p>
+            </div>
+
+            <div className="grid-2" style={{ gap: 36 }}>
+              <div className="sheet">
+                <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 20 }}>
+                  <CheckCircle2 size={19} color="var(--teal)" />
+                  <h3 className="display-sub" style={{ fontSize: 19 }}>
+                    Verified by the landlord or broker
+                  </h3>
+                </div>
+                <div className="ledger-row">
+                  <span style={{ fontWeight: 600 }}>Pass verdict</span>
+                  <span style={{ color: "var(--ink-secondary)", textAlign: "right", maxWidth: 280 }}>
+                    Qualified, Revoked, or Expired—read off-chain with zero wallet
+                  </span>
+                </div>
+                <div className="ledger-row">
+                  <span style={{ fontWeight: 600 }}>Bank-anchored source</span>
+                  <span style={{ color: "var(--ink-secondary)", textAlign: "right", maxWidth: 280 }}>
+                    Confirmed from Plaid, Tink, or Argyle—blocks Photoshopped PDFs
+                  </span>
+                </div>
+                <div className="ledger-row">
+                  <span style={{ fontWeight: 600 }}>Listing &amp; identity lock</span>
+                  <span style={{ color: "var(--ink-secondary)", textAlign: "right", maxWidth: 280 }}>
+                    Cannot forward a cheap-room pass to a penthouse or borrow a friend&apos;s bank
+                  </span>
+                </div>
+                <div className="ledger-row">
+                  <span style={{ fontWeight: 600 }}>14-day automatic expiry</span>
+                  <span style={{ color: "var(--ink-secondary)", textAlign: "right", maxWidth: 280 }}>
+                    Expires cleanly after two weeks, or instantly when revoked
+                  </span>
+                </div>
+              </div>
+
+              <div className="sheet" style={{ background: "var(--surface-tint)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 20 }}>
+                  <EyeOff size={19} color="var(--ink)" />
+                  <h3 className="display-sub" style={{ fontSize: 19 }}>
+                    Never disclosed to anyone
+                  </h3>
+                </div>
+                <div className="ledger-row">
+                  <span style={{ fontWeight: 600 }}>Exact monthly salary</span>
+                  <span style={{ color: "var(--ink-secondary)", textAlign: "right", maxWidth: 280 }}>
+                    Brokers never learn whether you earn $7k or $40k per month
+                  </span>
+                </div>
+                <div className="ledger-row">
+                  <span style={{ fontWeight: 600 }}>Total balance &amp; spending</span>
+                  <span style={{ color: "var(--ink-secondary)", textAlign: "right", maxWidth: 280 }}>
+                    Zero transaction history or PDF statements in broker inboxes
+                  </span>
+                </div>
+                <div className="ledger-row">
+                  <span style={{ fontWeight: 600 }}>Passport &amp; employer name</span>
+                  <span style={{ color: "var(--ink-secondary)", textAlign: "right", maxWidth: 280 }}>
+                    Presented once at final lease signing, never during viewings
+                  </span>
+                </div>
+                <div className="ledger-row">
+                  <span style={{ fontWeight: 600 }}>Other apartments toured</span>
+                  <span style={{ color: "var(--ink-secondary)", textAlign: "right", maxWidth: 280 }}>
+                    Every listing pass is unlinkable across different landlords
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FAIR, INCENTIVE-ALIGNED PRICING (Clean Architectural Columns — Fixed CTAs) */}
+        <section className="section-band">
+          <div className="container">
+            <div style={{ maxWidth: 680, marginBottom: 40 }}>
+              <h2 className="display-section" style={{ marginBottom: 10 }}>
+                Free for landlords. One $1.99 pass replaces $35 to $50 per-listing fees.
+              </h2>
+              <p className="lead-copy">
+                Aligned with how real rental markets work—zero friction for brokers, huge savings
+                for renters touring multiple units.
               </p>
             </div>
 
             <div className="grid-3">
-              <div className="card">
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                  <Building2 size={20} color="#7c5cff" style={{ flexShrink: 0 }} />
-                  <strong style={{ fontSize: 17 }}>Apartment &amp; House Viewing</strong>
-                </div>
-                <p style={{ margin: 0, fontSize: 14, color: "var(--muted)", lineHeight: 1.6 }}>
-                  Confirms your <strong style={{ color: "var(--text)" }}>monthly income is ≥ 3× rent</strong>{" "}
-                  and <strong style={{ color: "var(--text)" }}>deposit savings ≥ 2× rent</strong>{" "}
-                  directly from verified payroll or bank data.
-                </p>
-              </div>
-
-              <div className="card" style={{ borderColor: "rgba(34, 211, 238, 0.32)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                  <Laptop size={20} color="#22d3ee" style={{ flexShrink: 0 }} />
-                  <strong style={{ fontSize: 17 }}>Freelancer &amp; Co-Living Runway</strong>
-                </div>
-                <p style={{ margin: 0, fontSize: 14, color: "var(--muted)", lineHeight: 1.6 }}>
-                  No corporate payslip? No problem. Prove{" "}
-                  <strong style={{ color: "var(--text)" }}>6+ months of liquid rent runway</strong>{" "}
-                  in seconds without exposing your full savings account.
-                </p>
-              </div>
-
-              <div className="card">
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                  <Car size={20} color="#10b981" style={{ flexShrink: 0 }} />
-                  <strong style={{ fontSize: 17 }}>Vehicle &amp; Equipment Lease</strong>
-                </div>
-                <p style={{ margin: 0, fontSize: 14, color: "var(--muted)", lineHeight: 1.6 }}>
-                  Instant affordability check for EV subscriptions and equipment leases—locked to
-                  that specific vehicle and your verified identity.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Human-Readable Privacy Comparison */}
-        <section style={{ padding: "64px 0", borderBottom: "1px solid var(--border)" }}>
-          <div className="container">
-            <div style={{ marginBottom: 28 }}>
-              <span className="badge badge-violet" style={{ marginBottom: 10 }}>
-                Simple Privacy Promise
-              </span>
-              <h2 className="display-md">What Brokers See vs. What Stays on Your Device</h2>
-            </div>
-
-            <div className="grid-2">
-              <div className="card" style={{ borderColor: "rgba(16, 185, 129, 0.3)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                  <CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0 }} />
-                  <strong style={{ fontSize: 16 }}>What the Landlord / Broker Sees</strong>
-                </div>
-                <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 11, fontSize: 14, color: "var(--muted)", lineHeight: 1.55 }}>
-                  <li>
-                    <strong style={{ color: "var(--text)" }}>Clear Pass Status:</strong> Qualified,
-                    Revoked, or Expired—checked in any browser with zero crypto wallet required.
-                  </li>
-                  <li>
-                    <strong style={{ color: "var(--text)" }}>Bank-Verified Source:</strong>{" "}
-                    Cryptographic proof that the data came from Plaid, Tink, or Argyle—not a
-                    Photoshopped PDF.
-                  </li>
-                  <li>
-                    <strong style={{ color: "var(--text)" }}>Listing &amp; Identity Lock:</strong>{" "}
-                    A pass for a $500 room cannot be forwarded to a $5,000 penthouse or borrowed
-                    from a wealthy friend.
-                  </li>
-                  <li>
-                    <strong style={{ color: "var(--text)" }}>14-Day Auto-Expiry:</strong> Passes
-                    expire automatically, or instantly the moment you revoke access.
-                  </li>
-                </ul>
-              </div>
-
-              <div className="card" style={{ borderColor: "rgba(124, 92, 255, 0.3)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                  <EyeOff size={18} color="#7c5cff" style={{ flexShrink: 0 }} />
-                  <strong style={{ fontSize: 16 }}>What Nobody Ever Sees</strong>
-                </div>
-                <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 11, fontSize: 14, color: "var(--muted)", lineHeight: 1.55 }}>
-                  <li>
-                    <strong style={{ color: "var(--text)" }}>Your Exact Salary:</strong> Brokers
-                    only learn you clear the rent bar—never whether you earn $7k or $40k/mo.
-                  </li>
-                  <li>
-                    <strong style={{ color: "var(--text)" }}>Bank Balance &amp; Spending:</strong>{" "}
-                    Zero transaction history, zero PDF statements sitting in a broker&apos;s inbox.
-                  </li>
-                  <li>
-                    <strong style={{ color: "var(--text)" }}>Passport / ID Scans:</strong> Keep
-                    your legal ID off WhatsApp; show it once when signing your final lease.
-                  </li>
-                  <li>
-                    <strong style={{ color: "var(--text)" }}>Other Apartments You Applied To:</strong>{" "}
-                    Every viewing pass is unlinkable across different landlords.
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Incentive-Aligned Pricing (Fixed CTAs!) */}
-        <section style={{ padding: "64px 0" }}>
-          <div className="container">
-            <div style={{ marginBottom: 28 }}>
-              <span className="badge badge-neutral" style={{ marginBottom: 10 }}>
-                Fair, Simple Pricing
-              </span>
-              <h2 className="display-md">Free for Landlords. One $1.99 Pass Replaces $35–$50 Per-Listing Fees.</h2>
-            </div>
-
-            <div className="grid-3">
-              <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 18 }}>
+              <div
+                className="sheet"
+                style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 22 }}
+              >
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                    <span className="badge badge-ok">Landlords &amp; Brokers</span>
-                    <strong className="tabular" style={{ fontSize: 17, whiteSpace: "nowrap" }}>$0 Forever</strong>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--teal)" }}>
+                      Landlords &amp; Brokers
+                    </span>
+                    <strong className="tabular" style={{ fontSize: 22, fontFamily: "var(--font-display)", whiteSpace: "nowrap" }}>
+                      $0 Forever
+                    </strong>
                   </div>
-                  <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Walletless Instant Verifier</h3>
-                  <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)", lineHeight: 1.6 }}>
-                    Verify any applicant&apos;s Viewing Pass in 3 seconds from your browser—zero
-                    signup, zero wallet, and zero risky tenant PDFs to store.
+                  <h3 style={{ margin: "0 0 8px", fontSize: 18, fontFamily: "var(--font-display)" }}>
+                    Walletless Instant Verifier
+                  </h3>
+                  <p style={{ margin: 0, fontSize: 14.5, color: "var(--ink-secondary)", lineHeight: 1.55 }}>
+                    Confirm applicant qualification in 3 seconds from any browser with zero signup,
+                    zero crypto wallet, and zero tenant PDFs to store.
                   </p>
                 </div>
-                <Link href="/app?tab=landlord" className="btn-ghost" style={{ width: "fit-content" }}>
-                  Open Walletless Verifier <ArrowUpRight size={14} />
+                <Link href="/app?tab=landlord" className="btn-secondary" style={{ width: "fit-content" }}>
+                  Open Walletless Verifier
                 </Link>
               </div>
 
-              <div className="card" style={{ borderColor: "rgba(124, 92, 255, 0.45)", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 18 }}>
+              <div
+                className="sheet"
+                style={{
+                  borderColor: "var(--ink)",
+                  borderWidth: 1.5,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  gap: 22,
+                }}
+              >
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                    <span className="badge badge-violet">Active Renters</span>
-                    <strong className="tabular" style={{ fontSize: 17, color: "#c4b5fd", whiteSpace: "nowrap" }}>$1.99 / 30d</strong>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>
+                      Active Renters
+                    </span>
+                    <strong className="tabular" style={{ fontSize: 22, fontFamily: "var(--font-display)", whiteSpace: "nowrap" }}>
+                      $1.99 / 30d
+                    </strong>
                   </div>
-                  <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Reusable Multi-Listing Pass</h3>
-                  <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)", lineHeight: 1.6 }}>
-                    First pass is free. Then unlock unlimited listing-locked Viewing Passes for 30
-                    days—covering Open Banking verification once instead of paying $35–$50 per unit.
+                  <h3 style={{ margin: "0 0 8px", fontSize: 18, fontFamily: "var(--font-display)" }}>
+                    Reusable Multi-Listing Pass
+                  </h3>
+                  <p style={{ margin: 0, fontSize: 14.5, color: "var(--ink-secondary)", lineHeight: 1.55 }}>
+                    First pass is free. Then mint unlimited listing-locked Viewing Passes across 20+
+                    apartments—covering Open Banking verification once.
                   </p>
                 </div>
                 <Link href="/app" className="btn-primary" style={{ width: "fit-content" }}>
-                  Mint Reusable Pass <ArrowUpRight size={14} />
+                  Mint Reusable Pass
                 </Link>
               </div>
 
-              <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 18 }}>
+              <div
+                className="sheet"
+                style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 22 }}
+              >
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                    <span className="badge badge-cyan">Property Portals</span>
-                    <strong className="tabular" style={{ fontSize: 17, whiteSpace: "nowrap" }}>B2B Portal API</strong>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-muted)" }}>
+                      Property Portals
+                    </span>
+                    <strong className="tabular" style={{ fontSize: 22, fontFamily: "var(--font-display)", whiteSpace: "nowrap" }}>
+                      B2B API
+                    </strong>
                   </div>
-                  <h3 style={{ margin: "0 0 8px", fontSize: 17 }}>Embedded Pre-Qual Badge</h3>
-                  <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)", lineHeight: 1.6 }}>
-                    Drop-in verified badge for rental marketplaces and co-living platforms—cutting
+                  <h3 style={{ margin: "0 0 8px", fontSize: 18, fontFamily: "var(--font-display)" }}>
+                    Embedded Pre-Qual Badge
+                  </h3>
+                  <p style={{ margin: 0, fontSize: 14.5, color: "var(--ink-secondary)", lineHeight: 1.55 }}>
+                    Drop-in verified badge for rental marketplaces and co-living operators—filtering
                     broker spam while staying GDPR compliant.
                   </p>
                 </div>
-                <Link href="/deck" className="btn-ghost" style={{ width: "fit-content" }}>
-                  View Pitch Deck <ArrowUpRight size={14} />
+                <Link href="/deck" className="btn-secondary" style={{ width: "fit-content" }}>
+                  View Pitch Deck
                 </Link>
               </div>
             </div>
+          </div>
+        </section>
 
-            {/* Under the Hood — Dedicated Section for Midnight Technical Judges */}
-            <div
-              className="card-subtle"
-              style={{
-                marginTop: 40,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 16,
-                padding: "18px 20px",
-              }}
-            >
-              <div style={{ maxWidth: 680 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <Code2 size={16} color="#22d3ee" />
-                  <strong style={{ fontSize: 14.5 }}>
-                    Under the Hood · For Midnight Technical Judges
-                  </strong>
+        {/* OBSIDIAN ARCHITECTURAL ENGINEERING BAND (For Midnight Technical Judges) */}
+        <section className="obsidian-band">
+          <div className="container">
+            <div className="grid-2" style={{ gap: 36, alignItems: "center" }}>
+              <div style={{ display: "grid", gap: 16 }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "#5eead4", fontWeight: 600 }}>
+                  <Code2 size={16} /> Under the hood for Midnight judges
                 </div>
-                <p style={{ margin: 0, fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
-                  Powered by 1 parameterized Compact contract (
-                  <span className="mono" style={{ color: "var(--cyan)" }}>
-                    contracts/leaseproof.compact
-                  </span>
-                  , 7 circuits compiled on Ubuntu Linux CI via Compact 0.36.1) with admin-gated
-                  attester anchoring, ISO-4217 currency parity, windowed nullifiers, and 17 passing
-                  unit + adversarial tests.
+                <h2 className="display-section" style={{ color: "var(--bone)" }}>
+                  Hardened Compact 0.36.1 contract compiled and executed in Linux CI.
+                </h2>
+                <p style={{ margin: 0, fontSize: 15.5, color: "var(--bone-muted)", lineHeight: 1.6, maxWidth: "56ch" }}>
+                  Powered by <span className="mono" style={{ color: "var(--bone)" }}>contracts/leaseproof.compact</span>{" "}
+                  (7 circuits) and official{" "}
+                  <span className="mono" style={{ color: "var(--bone)" }}>contracts/witnesses.ts</span>{" "}
+                  executed directly on{" "}
+                  <span className="mono" style={{ color: "#5eead4" }}>@midnight-ntwrk/compact-runtime@0.21.0</span>.
+                  Test all 8 live red-team attacks—including local salary re-hashing, cross-listing
+                  forwarding, and secret-rotation replay—with zero wallet setup.
                 </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, paddingTop: 6 }}>
+                  <Link href="/app?tab=attacks" className="btn-on-dark">
+                    Open 8-Attack Security Lab
+                  </Link>
+                  <Link href="/deck" className="btn-noir-ghost">
+                    Read 8-Slide Pitch Deck
+                  </Link>
+                </div>
               </div>
-              <Link href="/app?tab=attacks" className="btn-ghost">
-                Open 8-Attack Security Lab <ArrowUpRight size={14} />
-              </Link>
+
+              <div className="obsidian-panel">
+                <div
+                  className="mono"
+                  style={{
+                    fontSize: 12,
+                    color: "#5eead4",
+                    paddingBottom: 12,
+                    marginBottom: 14,
+                    borderBottom: "1px solid var(--obsidian-border)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 10,
+                  }}
+                >
+                  <span>GitHub Actions · ubuntu-latest</span>
+                  <span>Run #10 · Passed</span>
+                </div>
+                <div className="mono" style={{ display: "grid", gap: 10, fontSize: 13, lineHeight: 1.5 }}>
+                  <div style={{ color: "var(--bone-muted)" }}>
+                    $ compact compile contracts/leaseproof.compact
+                  </div>
+                  <div style={{ color: "#5eead4" }}>
+                    ✓ compactc 0.36.1 — 7 circuits compiled cleanly (13s)
+                  </div>
+                  <div style={{ color: "var(--bone-muted)" }}>
+                    $ npm run test:compact
+                  </div>
+                  <div style={{ color: "#5eead4" }}>
+                    ✓ witnesses.ts + real compiled contract executed (passed)
+                  </div>
+                  <div style={{ color: "var(--bone-muted)" }}>
+                    $ npm test &amp;&amp; npm run lint
+                  </div>
+                  <div style={{ color: "#5eead4" }}>
+                    ✓ 17 adversarial unit tests passed · 0 lint warnings
+                  </div>
+                </div>
+              </div>
             </div>
 
             <footer
               style={{
-                marginTop: 32,
-                paddingTop: 20,
-                borderTop: "1px solid var(--border)",
+                marginTop: 56,
+                paddingTop: 22,
+                borderTop: "1px solid var(--obsidian-border)",
                 display: "flex",
                 justifyContent: "space-between",
                 flexWrap: "wrap",
                 gap: 12,
-                fontSize: 12.5,
-                color: "var(--muted)",
+                fontSize: 13,
+                color: "var(--bone-muted)",
               }}
             >
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <Lock size={13} color="#7c5cff" /> LeaseProof · Apache-2.0 Open Source · AKINDO × Midnight Wave 3
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                <Lock size={13} color="#5eead4" /> LeaseProof · Apache-2.0 Open Source · Built on Midnight Network
               </span>
-              <span>Compact 0.36.1 CI Verified · Transparent Interactive Browser Sandbox</span>
+              <span>Transparent 1:1 Browser Sandbox + Midnight Lace Wallet Connector</span>
             </footer>
           </div>
         </section>

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
-  ArrowLeft,
   Building2,
   CheckCircle2,
   Clock,
@@ -43,6 +42,7 @@ import {
   type TemplateType,
   type VerifyReceiptResult,
 } from "@/lib/zk/leaseproofEngine";
+import { CairnVerifier } from "@/components/CairnVerifier";
 
 type RoleTab = "tenant" | "landlord" | "attacks";
 
@@ -59,53 +59,52 @@ const fmtMoney = (n: number, currency: CurrencyCode) =>
   `${CURRENCY_META[currency].symbol}${Math.round(n).toLocaleString("en-US")}`;
 
 const TEMPLATE_LABEL: Record<TemplateType, string> = {
-  APARTMENT: "Apartment / House Lease",
-  FREELANCER_COLIVING: "Freelancer / Co-Living Runway",
-  VEHICLE_LEASE: "Vehicle / Equipment Lease",
+  APARTMENT: "Apartment / House",
+  FREELANCER_COLIVING: "Freelancer Runway",
+  VEHICLE_LEASE: "Vehicle Lease",
 };
 
-export default function LeaseProofWorkspace() {
-  const [engine, setEngine] = useState(() => createSeededLeaseProofEngine());
+export default function LeaseProofWorkspacePage() {
+  const [engine, setEngine] = useState(() => createSeededLeaseProofEngine(1_795_600_000));
   const [snapshot, setSnapshot] = useState<LedgerSnapshot>(() => engine.getSnapshot());
   const [activeTab, setActiveTab] = useState<RoleTab>("tenant");
   const [attackSeq, setAttackSeq] = useState(1);
+  const [proofSeq, setProofSeq] = useState(0);
 
-  // Tenant Proof Studio state
+  // Tenant Studio form state (local private witnesses)
   const [selectedListingId, setSelectedListingId] = useState("apt-soho-204");
   const [selectedIssuerId, setSelectedIssuerId] = useState("argyle-payroll");
-  const [tenantLabel, setTenantLabel] = useState("Maya (Senior Designer)");
-  const [kycIdSeed, setKycIdSeed] = useState("kyc-maya-ssn-9921");
-  const [tenantSecret, setTenantSecret] = useState("tenant-secret-maya-2026");
   const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(840);
+  const [tenantLabel, setTenantLabel] = useState("Maya (Senior Designer)");
+  const [kycIdSeed, setKycIdSeed] = useState("kyc-maya-ssn-9042");
+  const [tenantSecret, setTenantSecret] = useState("tenant-secret-maya-2026");
   const [monthlyIncome, setMonthlyIncome] = useState(9500);
   const [liquidBalance, setLiquidBalance] = useState(18000);
   const [lastResult, setLastResult] = useState<CircuitExecutionResult | null>(null);
   const [activeReceiptId, setActiveReceiptId] = useState<string | null>(null);
 
-  // Landlord Walletless Verifier state
+  // Landlord Verifier state
   const [verifyInput, setVerifyInput] = useState("");
   const [verifyExpectedListingId, setVerifyExpectedListingId] = useState("apt-soho-204");
   const [verifiedLookup, setVerifiedLookup] = useState<VerifyReceiptResult | null>(null);
-
-  // Create Custom Listing state
-  const [newListingTitle, setNewListingTitle] = useState("Shibuya Loft · 1BR ($2,100/mo)");
-  const [newListingLoc, setNewListingLoc] = useState("Tokyo, Japan");
+  const [newListingTitle, setNewListingTitle] = useState("Shibuya Studio · 1K Minimalist");
+  const [newListingLoc, setNewListingLoc] = useState("Tokyo");
   const [newListingMode, setNewListingMode] = useState<ListingMode>(0);
   const [newListingCurrency, setNewListingCurrency] = useState<CurrencyCode>(840);
   const [newListingRent, setNewListingRent] = useState(2100);
   const [newListingMinIncome, setNewListingMinIncome] = useState(6300);
   const [newListingMinBalance, setNewListingMinBalance] = useState(4200);
 
-  // Attack Lab state
+  // Attack Lab & Lace Wallet state
   const [attackLogs, setAttackLogs] = useState<AttackLogEntry[]>([]);
   const [laceWallet, setLaceWallet] = useState<LaceConnectionResult | null>(null);
   const [toast, setToast] = useState<{ tone: "ok" | "danger"; title: string; detail: string } | null>(null);
 
-  const showToast = (tone: "ok" | "danger", title: string, detail: string) => {
+  const showToast = (tone: "ok" | "danger", title: string, detail: string, durationMs = 4200) => {
     setToast({ tone, title, detail });
     setTimeout(() => {
       setToast((cur) => (cur?.title === title ? null : cur));
-    }, 3600);
+    }, durationMs);
   };
 
   const handleConnectLace = async () => {
@@ -114,16 +113,25 @@ export default function LeaseProofWorkspace() {
     if (res.connected && res.address) {
       showToast(
         "ok",
-        `Lace Wallet Connected (${shortMidnightAddr(res.address)})`,
+        `${res.walletName ?? "Lace"} connected (${shortMidnightAddr(res.address)})`,
         res.proverServerUri
-          ? `Midnight DApp Connector active · Prover: ${res.proverServerUri}`
-          : "Midnight DApp Connector active · Ready for Preprod proving."
+          ? `Midnight ${res.networkId ?? "preprod"} (v${res.apiVersion ?? "4"}) · Prover: ${res.proverServerUri}`
+          : `Midnight DApp Connector v${res.apiVersion ?? "4"} (${res.networkId ?? "preprod"}) active.`,
+        5200
+      );
+    } else if (res.cardanoOnlyDetected) {
+      showToast(
+        "ok",
+        "Lace Detected (Cardano Mode)",
+        res.error ?? "Switch or add a Midnight wallet in Lace, then press F5 to reload this tab.",
+        7000
       );
     } else {
       showToast(
         "ok",
         "Walletless Sandbox Mode Active",
-        res.error ?? "Lace extension not detected—test every circuit invariant instantly without a wallet."
+        res.error ?? "Lace extension not detected—test every circuit invariant instantly without a wallet.",
+        6500
       );
     }
   };
@@ -161,31 +169,45 @@ export default function LeaseProofWorkspace() {
       setSelectedListingId("coliving-lisbon-09");
       setSelectedIssuerId("tink-eu");
       setCurrencyCode(978);
-      setTenantLabel("Rafi (Remote Freelancer · €0 Payslip)");
+      setTenantLabel("Rafi (Indie Founder · €0 Payslip)");
       setKycIdSeed(`kyc-rafi-${uniq}`);
       setTenantSecret(`secret-rafi-${uniq}`);
       setMonthlyIncome(0);
       setLiquidBalance(14500);
     } else {
       setSelectedListingId("ev-fleet-model3");
-      setSelectedIssuerId("tink-eu");
+      setSelectedIssuerId("plaid-us");
       setCurrencyCode(978);
-      setTenantLabel("Lukas (Berlin Engineer)");
-      setKycIdSeed(`kyc-lukas-${uniq}`);
-      setTenantSecret(`secret-lukas-${uniq}`);
-      setMonthlyIncome(4200);
-      setLiquidBalance(6500);
+      setTenantLabel("Sora (EV Lease Applicant)");
+      setKycIdSeed(`kyc-sora-${uniq}`);
+      setTenantSecret(`secret-sora-${uniq}`);
+      setMonthlyIncome(5400);
+      setLiquidBalance(9000);
     }
+    setLastResult(null);
+  };
+
+  const resetLedger = () => {
+    const fresh = createSeededLeaseProofEngine(1_795_600_000);
+    setEngine(fresh);
+    syncLedger(fresh);
+    setActiveReceiptId(null);
+    setLastResult(null);
+    setVerifiedLookup(null);
+    setVerifyInput("");
+    setAttackLogs([]);
+    showToast("ok", "Sandbox Reset", "Midnight public ledger restored to seeded Wave 3 state.");
   };
 
   const handleGenerateProof = () => {
+    const issuerSecret = DEMO_ISSUER_SECRETS[selectedIssuerId] ?? "unregistered-secret";
     const now = engine.getCurrentEpoch();
     const witness = engine.issueAndAnchorAttestation({
       tenantLabel,
-      tenantSecret,
-      kycIdSeed,
+      tenantSecret: tenantSecret.trim() || "tenant-secret-default",
+      kycIdSeed: kycIdSeed.trim() || "kyc-default",
       issuerId: selectedIssuerId,
-      issuerSecret: DEMO_ISSUER_SECRETS[selectedIssuerId] ?? "",
+      issuerSecret,
       currencyCode,
       monthlyIncome,
       liquidBalance,
@@ -196,14 +218,15 @@ export default function LeaseProofWorkspace() {
     syncLedger();
 
     if (res.ok && res.receipt) {
+      setProofSeq((n) => n + 1);
       setActiveReceiptId(res.receipt.receiptId);
       setVerifyInput(res.receipt.receiptId);
       setVerifyExpectedListingId(res.receipt.listingId);
       setVerifiedLookup(engine.queryPublicReceipt(res.receipt.receiptId, res.receipt.listingId));
       showToast(
         "ok",
-        "ZK Pre-Qualification Pass Issued",
-        `Issuer-anchored commitment verified · Raw salary & balance stay private.`
+        "Viewing Pass Issued",
+        "Issuer-anchored commitment verified. Exact salary and balance stay local."
       );
     } else {
       showToast(
@@ -223,8 +246,8 @@ export default function LeaseProofWorkspace() {
       }
       showToast(
         "ok",
-        "Pre-Qualification Pass Revoked",
-        "Public ledger status updated to REVOKED (2). Landlord can no longer use this pass."
+        "Viewing Pass Revoked",
+        "Ledger status flipped to REVOKED (2). Brokers can no longer verify this pass."
       );
     } else {
       showToast(
@@ -246,7 +269,7 @@ export default function LeaseProofWorkspace() {
     }
     showToast(
       "ok",
-      "On-Chain Ledger Epoch +15 Days",
+      "Ledger Epoch Advanced +15 Days",
       "Active 14-day passes are now EXPIRED (3); tenants can re-apply in the new window."
     );
   };
@@ -288,7 +311,7 @@ export default function LeaseProofWorkspace() {
     if (res.ok && res.listing) {
       setSelectedListingId(res.listing.id);
       setCurrencyCode(res.listing.currencyCode);
-      showToast("ok", "Listing Published", `${res.listing.title} is now active in Tenant Studio.`);
+      showToast("ok", "Listing Published", `${res.listing.title} is now live in Tenant Studio.`);
     } else {
       showToast("danger", `Listing Rejected (${res.errorCode})`, res.humanReason ?? "Invalid thresholds.");
     }
@@ -303,7 +326,7 @@ export default function LeaseProofWorkspace() {
       rec.issuerName
     )}&status=${liveStatus}&applicant=${encodeURIComponent(rec.applicantIdCommit.slice(0, 18))}`;
     navigator.clipboard?.writeText(url);
-    showToast("ok", "Shareable Verifier Link Copied", "Self-contained link works across any browser/device.");
+    showToast("ok", "Shareable Verifier Link Copied", "Works across any browser without a wallet.");
   };
 
   const runAdversarialAttack = (attackId: number) => {
@@ -525,23 +548,8 @@ export default function LeaseProofWorkspace() {
       reason,
       runLabel: `Run #${seq}`,
     };
-    setAttackLogs((prev) => [entry, ...prev].slice(0, 12));
-    showToast(
-      entry.blocked ? "ok" : "danger",
-      entry.blocked ? `Attack Blocked: ${entry.actualCode}` : "Unexpected Pass",
-      entry.reason
-    );
-  };
-
-  const resetLedger = () => {
-    const fresh = createSeededLeaseProofEngine();
-    setEngine(fresh);
-    syncLedger(fresh);
-    setLastResult(null);
-    setActiveReceiptId(null);
-    setVerifiedLookup(null);
-    setAttackLogs([]);
-    showToast("ok", "Ledger Reset", "Fresh Midnight dual-ledger sandbox initialized.");
+    setAttackLogs((prev) => [entry, ...prev].slice(0, 8));
+    showToast(blocked ? "ok" : "danger", `Blocked (${actualCode})`, reason);
   };
 
   const activeIsExpired =
@@ -549,25 +557,46 @@ export default function LeaseProofWorkspace() {
 
   return (
     <>
-      <header className="site-header site-header-app">
+      {/* Obsidian Studio Top Header */}
+      <header className="site-header-noir site-header-wide">
         <div className="site-header-inner">
-          <Link href="/" className="brand-lockup">
-            <span className="brand-mark" aria-hidden="true">
-              <ShieldCheck size={18} strokeWidth={2.4} />
+          <Link href="/" className="brand-lockup" style={{ color: "var(--bone)" }}>
+            <span
+              className="brand-mark"
+              aria-hidden="true"
+              style={{
+                background: "linear-gradient(135deg, #f4f4f0, #a8b0ba)",
+                color: "#0e1014",
+              }}
+            >
+              <ShieldCheck size={17} strokeWidth={2.4} />
             </span>
             <span>LeaseProof</span>
-            <span className="nav-divider">|</span>
-            <span className="nav-sub">Simulated Compact Sandbox</span>
+            <span className="hide-sm" style={{ color: "var(--bone-muted)", fontWeight: 500, fontSize: 13.5 }}>
+              Compact Sandbox
+            </span>
           </Link>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span className="badge badge-ok tabular hide-mobile">
-              {snapshot.totalVerifiedPasses} Verified{" "}
-              {snapshot.totalVerifiedPasses === 1 ? "Pass" : "Passes"}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              className="tabular hide-sm"
+              style={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: "#5eead4",
+                padding: "5px 11px",
+                borderRadius: 999,
+                background: "rgba(20, 184, 166, 0.14)",
+                border: "1px solid rgba(94, 234, 212, 0.3)",
+              }}
+            >
+              {snapshot.totalVerifiedPasses} verified{" "}
+              {snapshot.totalVerifiedPasses === 1 ? "pass" : "passes"}
             </span>
             <button
               type="button"
-              className={laceWallet?.connected ? "btn-primary" : "btn-ghost"}
+              className={laceWallet?.connected ? "btn-liquid-glass" : "btn-noir-ghost"}
+              style={{ minHeight: 38, padding: "0 13px", fontSize: 13 }}
               onClick={handleConnectLace}
               title="Connect Midnight Lace Wallet (DApp Connector API)"
             >
@@ -576,370 +605,304 @@ export default function LeaseProofWorkspace() {
                 ? shortMidnightAddr(laceWallet.address)
                 : "Connect Lace"}
             </button>
-            <Link href="/deck" className="btn-ghost hide-mobile">
-              <Presentation size={15} /> Pitch Deck
+            <Link
+              href="/deck"
+              className="btn-noir-ghost hide-sm"
+              style={{ minHeight: 38, padding: "0 12px", fontSize: 13 }}
+            >
+              <Presentation size={14} /> Deck
             </Link>
-            <button type="button" className="btn-ghost hide-mobile" onClick={resetLedger}>
-              <RotateCcw size={14} /> Reset Demo
+            <button
+              type="button"
+              className="btn-noir-ghost"
+              style={{ minHeight: 38, padding: "0 12px", fontSize: 13 }}
+              onClick={resetLedger}
+              title="Reset sandbox ledger"
+              aria-label="Reset sandbox"
+            >
+              <RotateCcw size={13} /> <span className="hide-sm">Reset</span>
             </button>
+          </div>
+        </div>
+
+        {/* Always-Visible Liquid Glass Role Switcher Bar (Works on 1440px, 1115px, 768px & 390px!) */}
+        <div
+          style={{
+            borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+            background: "rgba(16, 18, 23, 0.92)",
+          }}
+        >
+          <div
+            className="site-header-inner"
+            style={{ height: "auto", paddingTop: 10, paddingBottom: 10, flexWrap: "wrap", gap: 12 }}
+          >
+            <div className="glass-tab-track" role="tablist" aria-label="LeaseProof workspace roles">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "tenant"}
+                className={`glass-tab-btn ${activeTab === "tenant" ? "is-active" : ""}`}
+                onClick={() => setActiveTab("tenant")}
+              >
+                <KeyRound size={15} /> Tenant Studio
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "landlord"}
+                className={`glass-tab-btn ${activeTab === "landlord" ? "is-active" : ""}`}
+                onClick={() => setActiveTab("landlord")}
+              >
+                <UserCheck size={15} /> Landlord Verifier
+                <span className="mono tabular" style={{ fontSize: 11.5, opacity: 0.75 }}>
+                  ({snapshot.receipts.length})
+                </span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "attacks"}
+                className={`glass-tab-btn ${activeTab === "attacks" ? "is-active" : ""}`}
+                onClick={() => setActiveTab("attacks")}
+              >
+                <ShieldAlert size={15} /> Attack &amp; Attester Lab
+              </button>
+            </div>
+
+            <span className="mono hide-sm" style={{ fontSize: 12, color: "var(--bone-muted)" }}>
+              1:1 Browser Mirror · contracts/leaseproof.compact (Compact 0.36.1)
+            </span>
           </div>
         </div>
       </header>
 
-      <div className="app-shell">
-        <aside className="app-sidebar">
-          <div className="side-group-label">ZK WORKSPACE ROLES</div>
-          <button
-            type="button"
-            className={`side-nav-btn ${activeTab === "tenant" ? "is-active" : ""}`}
-            onClick={() => setActiveTab("tenant")}
-          >
-            <KeyRound size={16} style={{ flexShrink: 0 }} />
-            1. Tenant Proof Studio
-          </button>
-          <button
-            type="button"
-            className={`side-nav-btn ${activeTab === "landlord" ? "is-active" : ""}`}
-            onClick={() => setActiveTab("landlord")}
-          >
-            <UserCheck size={16} style={{ flexShrink: 0 }} />
-            2. Landlord Verifier
-          </button>
-          <button
-            type="button"
-            className={`side-nav-btn ${activeTab === "attacks" ? "is-active" : ""}`}
-            onClick={() => setActiveTab("attacks")}
-          >
-            <ShieldAlert size={16} style={{ flexShrink: 0 }} />
-            3. Attack &amp; Attester Lab
-          </button>
+      <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 80 }}>
+        {/* TAB 1: TENANT PROOF STUDIO */}
+        {activeTab === "tenant" && (
+          <section className="workspace-grid">
+            {/* Left Sheet: Local Private Witness Inputs */}
+            <div style={{ display: "grid", gap: 20 }}>
+              <div className="sheet">
+                <div style={{ marginBottom: 20 }}>
+                  <h1 className="display-sub" style={{ marginBottom: 6 }}>
+                    Issue a Private Viewing Pass
+                  </h1>
+                  <p style={{ margin: 0, fontSize: 14.5, color: "var(--ink-secondary)" }}>
+                    Your financial inputs stay strictly on your device as local Compact witnesses.
+                  </p>
+                </div>
 
-          <div className="side-group-label" style={{ marginTop: 14 }}>
-            DELIVERABLES
-          </div>
-          <Link href="/deck" className="side-nav-btn" style={{ textDecoration: "none" }}>
-            <Presentation size={16} style={{ flexShrink: 0 }} />
-            8-Slide Pitch Deck
-          </Link>
-          <Link href="/" className="side-nav-btn" style={{ textDecoration: "none" }}>
-            <ArrowLeft size={16} style={{ flexShrink: 0 }} />
-            Back to Overview
-          </Link>
+                {/* One-Click Realistic Personas */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 22 }}>
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => applyPersona("salaried")}>
+                    <Sparkles size={13} color="var(--teal)" /> Salaried Tenant (USD)
+                  </button>
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => applyPersona("freelancer")}>
+                    <Sparkles size={13} color="var(--teal)" /> Freelancer · €0 Payslip
+                  </button>
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => applyPersona("ev")}>
+                    <Sparkles size={13} color="var(--teal)" /> EV Lease (EUR)
+                  </button>
+                </div>
 
-          <div className="card-subtle" style={{ marginTop: "auto", fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
-            <strong style={{ color: "var(--text)", display: "block", marginBottom: 4 }}>
-              Transparent Sandbox Mode
-            </strong>
-            Runs a 1:1 TypeScript mirror of{" "}
-            <span className="mono" style={{ color: "var(--cyan)" }}>
-              leaseproof.compact
-            </span>{" "}
-            for instant walletless judge testing (real Compact compiler runs on Ubuntu Linux CI).
-          </div>
-        </aside>
-
-        <main className="app-main">
-          {/* TAB 1: TENANT PROOF STUDIO */}
-          {activeTab === "tenant" && (
-            <section className="workspace-split reveal">
-              <div style={{ display: "grid", gap: 16 }}>
-                <div className="card">
-                  <div style={{ marginBottom: 14 }}>
-                    <span className="badge badge-violet" style={{ marginBottom: 6 }}>
-                      Local Private Witness · Pre-Qualification &amp; Viewing Pass
-                    </span>
-                    <h1 style={{ margin: 0, fontSize: 22, letterSpacing: "-0.02em" }}>
-                      Generate Private Pre-Qualification Pass
-                    </h1>
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <label className="field-label" htmlFor="listing-select">
+                      Target Property / Lease Listing
+                    </label>
+                    <select
+                      id="listing-select"
+                      className="input-field"
+                      value={selectedListingId}
+                      onChange={(e) => {
+                        const next = snapshot.listings.find((l) => l.id === e.target.value);
+                        setSelectedListingId(e.target.value);
+                        if (next) setCurrencyCode(next.currencyCode);
+                      }}
+                    >
+                      {snapshot.listings.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.title} ({CURRENCY_META[l.currencyCode].code}) — {TEMPLATE_LABEL[l.template]}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedListing && (
+                      <div style={{ fontSize: 12.5, color: "var(--ink-muted)", marginTop: 6 }}>
+                        Required ({CURRENCY_META[selectedListing.currencyCode].code}):{" "}
+                        {selectedListing.mode === 0
+                          ? `Income >= ${fmtMoney(selectedListing.minIncome, selectedListing.currencyCode)}/mo and Balance >= ${fmtMoney(selectedListing.minBalance, selectedListing.currencyCode)}`
+                          : `Liquid Runway >= ${fmtMoney(selectedListing.minBalance, selectedListing.currencyCode)} (No payslip required)`}
+                      </div>
+                    )}
                   </div>
 
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
-                    <button type="button" className="btn-ghost" onClick={() => applyPersona("salaried")}>
-                      <Sparkles size={14} color="#7c5cff" /> Salaried Tenant (USD)
-                    </button>
-                    <button type="button" className="btn-ghost" onClick={() => applyPersona("freelancer")}>
-                      <Sparkles size={14} color="#22d3ee" /> Freelancer · €0 Payslip (EUR)
-                    </button>
-                    <button type="button" className="btn-ghost" onClick={() => applyPersona("ev")}>
-                      <Sparkles size={14} color="#10b981" /> EV Subscription (EUR)
-                    </button>
-                  </div>
-
-                  <div style={{ display: "grid", gap: 14 }}>
+                  <div className="grid-2" style={{ alignItems: "end" }}>
                     <div>
-                      <label className="field-label" htmlFor="listing-select">
-                        Target Property / Lease Listing
+                      <label className="field-label" htmlFor="issuer-select">
+                        Verified Bank / Payroll Attester
                       </label>
                       <select
-                        id="listing-select"
-                        className="input-dark"
-                        value={selectedListingId}
-                        onChange={(e) => {
-                          const next = snapshot.listings.find((l) => l.id === e.target.value);
-                          setSelectedListingId(e.target.value);
-                          if (next) setCurrencyCode(next.currencyCode);
-                        }}
+                        id="issuer-select"
+                        className="input-field"
+                        value={selectedIssuerId}
+                        onChange={(e) => setSelectedIssuerId(e.target.value)}
                       >
-                        {snapshot.listings.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.title} ({CURRENCY_META[l.currencyCode].code}) — {TEMPLATE_LABEL[l.template]}
+                        {snapshot.issuers.map((iss) => (
+                          <option key={iss.id} value={iss.id}>
+                            {iss.name} ({iss.active ? "Active" : "REVOKED"})
                           </option>
                         ))}
                       </select>
-                      {selectedListing && (
-                        <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>
-                          Required ({CURRENCY_META[selectedListing.currencyCode].code}):{" "}
-                          {selectedListing.mode === 0
-                            ? `Income ≥ ${fmtMoney(selectedListing.minIncome, selectedListing.currencyCode)}/mo AND Balance ≥ ${fmtMoney(selectedListing.minBalance, selectedListing.currencyCode)}`
-                            : `Liquid Runway ≥ ${fmtMoney(selectedListing.minBalance, selectedListing.currencyCode)} (No payslip required)`}
-                        </div>
-                      )}
                     </div>
-
-                    <div className="grid-2" style={{ alignItems: "end" }}>
-                      <div>
-                        <label className="field-label" htmlFor="issuer-select">
-                          Verified Bank / Payroll Attester
-                        </label>
-                        <select
-                          id="issuer-select"
-                          className="input-dark"
-                          value={selectedIssuerId}
-                          onChange={(e) => setSelectedIssuerId(e.target.value)}
-                        >
-                          {snapshot.issuers.map((iss) => (
-                            <option key={iss.id} value={iss.id}>
-                              {iss.name} ({iss.active ? "Active" : "REVOKED"})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="field-label" htmlFor="currency-select">
-                          Currency (ISO-4217)
-                        </label>
-                        <select
-                          id="currency-select"
-                          className="input-dark"
-                          value={currencyCode}
-                          onChange={(e) => setCurrencyCode(Number(e.target.value) as CurrencyCode)}
-                        >
-                          <option value={840}>840 · USD ($)</option>
-                          <option value={978}>978 · EUR (€)</option>
-                          <option value={360}>360 · IDR (Rp)</option>
-                        </select>
-                      </div>
+                    <div>
+                      <label className="field-label" htmlFor="currency-select">
+                        Currency (ISO-4217)
+                      </label>
+                      <select
+                        id="currency-select"
+                        className="input-field"
+                        value={currencyCode}
+                        onChange={(e) => setCurrencyCode(Number(e.target.value) as CurrencyCode)}
+                      >
+                        <option value={840}>840 · USD ($)</option>
+                        <option value={978}>978 · EUR (€)</option>
+                        <option value={360}>360 · IDR (Rp)</option>
+                      </select>
                     </div>
-
-                    <div className="grid-2" style={{ alignItems: "end" }}>
-                      <div>
-                        <label className="field-label" htmlFor="income-input">
-                          Private Monthly Income ({CURRENCY_META[currencyCode].code})
-                        </label>
-                        <input
-                          id="income-input"
-                          type="number"
-                          className="input-dark tabular"
-                          value={monthlyIncome}
-                          onChange={(e) => setMonthlyIncome(Math.max(0, Number(e.target.value) || 0))}
-                        />
-                      </div>
-                      <div>
-                        <label className="field-label" htmlFor="balance-input">
-                          Private Liquid Balance ({CURRENCY_META[currencyCode].code})
-                        </label>
-                        <input
-                          id="balance-input"
-                          type="number"
-                          className="input-dark tabular"
-                          value={liquidBalance}
-                          onChange={(e) => setLiquidBalance(Math.max(0, Number(e.target.value) || 0))}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid-2" style={{ alignItems: "end" }}>
-                      <div>
-                        <label className="field-label" htmlFor="kyc-input">
-                          Identity Binding Seed
-                        </label>
-                        <input
-                          id="kyc-input"
-                          type="text"
-                          className="input-dark mono"
-                          value={kycIdSeed}
-                          onChange={(e) => setKycIdSeed(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="field-label" htmlFor="secret-input">
-                          Pass Revocation Secret
-                        </label>
-                        <input
-                          id="secret-input"
-                          type="text"
-                          className="input-dark mono"
-                          value={tenantSecret}
-                          onChange={(e) => setTenantSecret(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <button type="button" className="btn-primary" onClick={handleGenerateProof}>
-                      <ShieldCheck size={16} /> Generate Midnight ZK Qualification Pass
-                    </button>
                   </div>
+
+                  <div className="grid-2" style={{ alignItems: "end" }}>
+                    <div>
+                      <label className="field-label" htmlFor="income-input">
+                        Private Monthly Income ({CURRENCY_META[currencyCode].code})
+                      </label>
+                      <input
+                        id="income-input"
+                        type="number"
+                        className="input-field tabular"
+                        value={monthlyIncome}
+                        onChange={(e) => setMonthlyIncome(Math.max(0, Number(e.target.value) || 0))}
+                      />
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor="balance-input">
+                        Private Liquid Balance ({CURRENCY_META[currencyCode].code})
+                      </label>
+                      <input
+                        id="balance-input"
+                        type="number"
+                        className="input-field tabular"
+                        value={liquidBalance}
+                        onChange={(e) => setLiquidBalance(Math.max(0, Number(e.target.value) || 0))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid-2" style={{ alignItems: "end" }}>
+                    <div>
+                      <label className="field-label" htmlFor="kyc-input">
+                        Identity Binding Seed
+                      </label>
+                      <input
+                        id="kyc-input"
+                        type="text"
+                        className="input-field mono"
+                        value={kycIdSeed}
+                        onChange={(e) => setKycIdSeed(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor="secret-input">
+                        Pass Revocation Secret
+                      </label>
+                      <input
+                        id="secret-input"
+                        type="text"
+                        className="input-field mono"
+                        value={tenantSecret}
+                        onChange={(e) => setTenantSecret(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <button type="button" className="btn-primary" onClick={handleGenerateProof} style={{ marginTop: 4 }}>
+                    <ShieldCheck size={16} /> Generate Midnight ZK Qualification Pass
+                  </button>
                 </div>
-
-                {lastResult && !lastResult.ok && (
-                  <div className="card" style={{ borderColor: "rgba(239, 68, 68, 0.45)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#f87171", marginBottom: 6 }}>
-                      <XCircle size={18} style={{ flexShrink: 0 }} />
-                      <strong>Compact Circuit Refused: {lastResult.errorCode}</strong>
-                    </div>
-                    <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)", lineHeight: 1.5 }}>
-                      {lastResult.humanReason}
-                    </p>
-                  </div>
-                )}
               </div>
 
-              {/* Right: Split-Screen Privacy Inspector + Active Pass */}
-              <div style={{ display: "grid", gap: 16 }}>
-                <div className="card" style={{ borderColor: "rgba(124, 92, 255, 0.35)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                    <strong style={{ fontSize: 16 }}>Split-Screen Privacy Inspector</strong>
-                    <span className="badge badge-ok">Threshold-Only Proof</span>
+              {lastResult && !lastResult.ok && (
+                <div
+                  className="sheet-tight"
+                  style={{
+                    borderColor: "var(--vermilion-border)",
+                    background: "var(--vermilion-soft)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--vermilion)", marginBottom: 4 }}>
+                    <XCircle size={17} />
+                    <strong>Compact Circuit Refused: {lastResult.errorCode}</strong>
                   </div>
-
-                  <div className="grid-2" style={{ gap: 12 }}>
-                    <div className="card-subtle" style={{ borderColor: "rgba(124, 92, 255, 0.28)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#c4b5fd", marginBottom: 10 }}>
-                        <EyeOff size={14} /> PRIVATE WITNESS (LOCAL)
-                      </div>
-                      <div style={{ display: "grid", gap: 8, fontSize: 12.5 }}>
-                        <div>
-                          <div style={{ color: "var(--muted)" }}>Exact Income</div>
-                          <strong className="tabular">{fmtMoney(monthlyIncome, currencyCode)}/mo</strong>
-                        </div>
-                        <div>
-                          <div style={{ color: "var(--muted)" }}>Exact Balance</div>
-                          <strong className="tabular">{fmtMoney(liquidBalance, currencyCode)}</strong>
-                        </div>
-                        <div>
-                          <div style={{ color: "var(--muted)" }}>Raw KYC ID Seed</div>
-                          <strong className="mono">{kycIdSeed.slice(0, 14)}...</strong>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="card-subtle" style={{ borderColor: "rgba(16, 185, 129, 0.3)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#34d399", marginBottom: 10 }}>
-                        <CheckCircle2 size={14} /> PUBLIC LEDGER (ON-CHAIN)
-                      </div>
-                      {activeReceipt ? (
-                        <div style={{ display: "grid", gap: 8, fontSize: 12.5 }}>
-                          <div>
-                            <div style={{ color: "var(--muted)" }}>Verdict</div>
-                            <strong
-                              style={{
-                                color:
-                                  activeReceipt.status === 2
-                                    ? "var(--red)"
-                                    : activeIsExpired
-                                    ? "var(--amber)"
-                                    : "var(--green)",
-                              }}
-                            >
-                              {activeReceipt.status === 2
-                                ? "REVOKED (2)"
-                                : activeIsExpired
-                                ? "EXPIRED (3)"
-                                : "QUALIFIED (1)"}
-                            </strong>
-                          </div>
-                          <div>
-                            <div style={{ color: "var(--muted)" }}>Bound Listing</div>
-                            <strong>{activeReceipt.listingId}</strong>
-                          </div>
-                          <div>
-                            <div style={{ color: "var(--muted)" }}>KYC Binding Commit</div>
-                            <strong className="mono">{activeReceipt.applicantIdCommit.slice(0, 14)}...</strong>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                          Generate a pass on the left to inspect the public Midnight ledger state.
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <p style={{ margin: 0, fontSize: 13.5, color: "var(--ink-secondary)" }}>
+                    {lastResult.humanReason}
+                  </p>
                 </div>
+              )}
+            </div>
 
-                {activeReceipt && (
-                  <div
-                    className="viewing-pass-card"
-                    style={{
-                      borderColor:
+            {/* Right Column: Physical Viewing Pass + Split-Screen Privacy Inspector */}
+            <div style={{ display: "grid", gap: 20 }}>
+              {activeReceipt ? (
+                <div className="viewing-pass">
+                  <div className="viewing-pass-head">
+                    <div>
+                      <div style={{ fontSize: 12, color: "var(--ink-muted)", marginBottom: 4 }}>
+                        Issued Viewing Pass · 14-day validity
+                      </div>
+                      <h2 className="display-sub" style={{ fontSize: 20 }}>
+                        {activeReceipt.listingTitle}
+                      </h2>
+                      <div style={{ fontSize: 13, color: "var(--ink-secondary)", marginTop: 2 }}>
+                        Verified by {activeReceipt.issuerName}
+                      </div>
+                    </div>
+
+                    <CairnVerifier
+                      triggerKey={`${activeReceipt.receiptId}-${proofSeq}-${activeReceipt.status}-${activeIsExpired}`}
+                      isQualified={activeReceipt.status === 1 && !activeIsExpired}
+                      statusLabel={
                         activeReceipt.status === 2
-                          ? "rgba(239, 68, 68, 0.42)"
+                          ? "REVOKED (2)"
                           : activeIsExpired
-                          ? "rgba(245, 158, 11, 0.45)"
-                          : "rgba(16, 185, 129, 0.42)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: 8,
-                        flexWrap: "wrap",
-                        marginBottom: 12,
-                      }}
-                    >
-                      <span
-                        className={`badge ${
-                          activeReceipt.status === 2
-                            ? "badge-danger"
-                            : activeIsExpired
-                            ? "badge-warn"
-                            : "badge-ok"
-                        }`}
-                      >
-                        {activeReceipt.status === 2
-                          ? "REVOKED BY TENANT"
-                          : activeIsExpired
-                          ? "EXPIRED (14D WINDOW ENDED)"
-                          : "VERIFIED QUALIFIED · ACTIVE"}
-                      </span>
-                      <span className="mono" style={{ fontSize: 11.5, color: "var(--muted)", whiteSpace: "nowrap" }}>
-                        14d fixed validity
-                      </span>
-                    </div>
+                            ? "EXPIRED (3)"
+                            : "QUALIFIED (1)"
+                      }
+                    />
+                  </div>
 
-                    <h3 style={{ margin: "0 0 4px", fontSize: 18 }}>{activeReceipt.listingTitle}</h3>
-                    <div style={{ fontSize: 13, color: "var(--muted)" }}>
-                      Verified by {activeReceipt.issuerName} · Listing-locked pass
-                    </div>
+                  <div className="viewing-pass-tear" />
 
-                    <hr className="pass-divider" />
-
-                    <div className="mono" style={{ fontSize: 11.5, color: "var(--cyan)", marginBottom: 14, wordBreak: "break-all" }}>
-                      Receipt: {activeReceipt.receiptId}
+                  <div className="viewing-pass-body" style={{ display: "grid", gap: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 11.5, color: "var(--ink-muted)", marginBottom: 2 }}>
+                        Listing-bound Receipt ID
+                      </div>
+                      <div className="mono" style={{ fontSize: 12, color: "var(--ink)", wordBreak: "break-all" }}>
+                        {activeReceipt.receiptId}
+                      </div>
                     </div>
 
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       <button
                         type="button"
-                        className="btn-ghost"
+                        className="btn-secondary btn-sm"
                         onClick={() => copyVerifierUrl(activeReceipt)}
                       >
-                        <Copy size={14} /> Copy Verifier Link
+                        <Copy size={13} /> Copy Verifier Link
                       </button>
                       <button
                         type="button"
-                        className="btn-ghost"
+                        className="btn-teal btn-sm"
                         onClick={() => {
                           setVerifyInput(activeReceipt.receiptId);
                           setVerifyExpectedListingId(activeReceipt.listingId);
@@ -954,431 +917,547 @@ export default function LeaseProofWorkspace() {
                       {activeReceipt.status === 1 && !activeIsExpired && (
                         <button
                           type="button"
-                          className="btn-danger"
+                          className="btn-danger btn-sm"
                           onClick={() => handleRevokeActivePass(activeReceipt.receiptId)}
                         >
-                          <ShieldOff size={14} /> Revoke Pass
+                          <ShieldOff size={13} /> Revoke Pass
                         </button>
                       )}
-                      <button type="button" className="btn-ghost" onClick={handleAdvance15Days}>
-                        <Clock size={14} /> Simulate +15 Days
+                      <button type="button" className="btn-secondary btn-sm" onClick={handleAdvance15Days}>
+                        <Clock size={13} /> Simulate +15 Days
                       </button>
                     </div>
                   </div>
-                )}
-              </div>
-            </section>
-          )}
-
-          {/* TAB 2: LANDLORD VERIFIER (TRUE WALLET-FREE OFF-CHAIN QUERY) */}
-          {activeTab === "landlord" && (
-            <section className="workspace-split reveal">
-              <div style={{ display: "grid", gap: 16 }}>
-                <div className="card">
-                  <span className="badge badge-ok" style={{ marginBottom: 8 }}>
-                    True Walletless Off-Chain Ledger Read · Listing-Bound Check
-                  </span>
-                  <h2 style={{ margin: "0 0 8px", fontSize: 21 }}>
-                    Landlord Pre-Qualification Verifier
-                  </h2>
-                  <p style={{ margin: "0 0 14px", fontSize: 13.5, color: "var(--muted)", lineHeight: 1.55 }}>
-                    Queries Midnight public ledger maps off-chain (zero wallet, zero proof needed).
-                    Verifies receipt status, 14-day expiry, AND exact listing binding so cheap-room
-                    passes cannot be forwarded to luxury listings.
-                  </p>
-
-                  <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
+                </div>
+              ) : (
+                <div
+                  className="viewing-pass"
+                  style={{
+                    borderStyle: "dashed",
+                    background: "var(--surface-tint)",
+                    boxShadow: "none",
+                  }}
+                >
+                  <div className="viewing-pass-head">
                     <div>
-                      <label className="field-label" htmlFor="verify-listing-select">
-                        Your Property Listing (Must Match Receipt)
-                      </label>
-                      <select
-                        id="verify-listing-select"
-                        className="input-dark"
-                        value={verifyExpectedListingId}
-                        onChange={(e) => {
-                          setVerifyExpectedListingId(e.target.value);
-                          setVerifiedLookup(null);
-                        }}
-                      >
-                        {snapshot.listings.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.title} ({l.id})
-                          </option>
-                        ))}
-                      </select>
+                      <div style={{ fontSize: 12, color: "var(--ink-muted)", marginBottom: 4 }}>
+                        Viewing Pass Preview · Ready to prove
+                      </div>
+                      <h2 className="display-sub" style={{ fontSize: 19 }}>
+                        {selectedListing?.title ?? "Select a listing"}
+                      </h2>
+                      <div style={{ fontSize: 13, color: "var(--ink-secondary)", marginTop: 2 }}>
+                        Attester:{" "}
+                        {snapshot.issuers.find((i) => i.id === selectedIssuerId)?.name ?? selectedIssuerId}
+                      </div>
                     </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <input
-                        type="text"
-                        className="input-dark mono"
-                        style={{ flex: 1, minWidth: 220, fontSize: 12.5 }}
-                        placeholder="0x... receipt ID"
-                        aria-label="Receipt ID to verify"
-                        value={verifyInput}
-                        onChange={(e) => setVerifyInput(e.target.value)}
-                      />
-                      <button type="button" className="btn-primary" onClick={() => handleVerifyReceipt()}>
-                        Verify Pass
-                      </button>
-                    </div>
+                    <span className="status-tag status-neutral">Unissued</span>
                   </div>
 
-                  {verifiedLookup && (
-                    <div
-                      className="card-subtle"
-                      style={{
-                        borderColor:
-                          verifiedLookup.status === 1
-                            ? "rgba(16, 185, 129, 0.45)"
-                            : "rgba(239, 68, 68, 0.45)",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                        <strong>
-                          {verifiedLookup.receipt?.listingTitle ?? "Lookup Result"}
-                        </strong>
-                        <span
-                          className={`badge ${
-                            verifiedLookup.status === 1 ? "badge-ok" : "badge-danger"
-                          }`}
-                        >
-                          {verifiedLookup.errorCode
-                            ? verifiedLookup.errorCode
-                            : verifiedLookup.status === 1
-                            ? "QUALIFIED"
-                            : verifiedLookup.status === 2
-                            ? "REVOKED"
-                            : verifiedLookup.status === 3
-                            ? "EXPIRED"
-                            : "NOT FOUND"}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 13, color: "var(--muted)" }}>
-                        {verifiedLookup.humanReason}
-                      </div>
+                  <div className="viewing-pass-tear" />
+
+                  <div className="viewing-pass-body" style={{ display: "grid", gap: 8 }}>
+                    <div style={{ fontSize: 13, color: "var(--ink-secondary)", lineHeight: 1.5 }}>
+                      Click <strong>Generate Midnight ZK Qualification Pass</strong> on the left to bind a
+                      14-day proof to <span className="mono">{selectedListing?.id}</span>. Your exact income
+                      and bank balance never leave this browser.
                     </div>
-                  )}
+                  </div>
+                </div>
+              )}
+
+              {/* Split-Screen Privacy Audit (Zero Card-in-Card: Single Sheet divided cleanly!) */}
+              <div className="sheet">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 18 }}>
+                  <strong style={{ fontFamily: "var(--font-display)", fontSize: 17 }}>
+                    Split-Screen Privacy Inspector
+                  </strong>
+                  <span className="status-tag status-teal">Zero raw values disclosed</span>
                 </div>
 
-                <div className="card">
-                  <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>
-                    Recent Public Ledger Receipts ({snapshot.receipts.length})
-                  </h3>
-                  {snapshot.receipts.length === 0 ? (
-                    <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)" }}>
-                      No passes issued yet. Switch to Tab 1 to generate a pass.
-                    </p>
-                  ) : (
-                    <div style={{ display: "grid", gap: 10 }}>
-                      {snapshot.receipts.map((rec) => {
-                        const expired = snapshot.currentLedgerEpoch > rec.expiresAtEpoch;
-                        const label = rec.status === 2 ? "REVOKED" : expired ? "EXPIRED" : "QUALIFIED";
-                        return (
-                          <div
-                            key={rec.receiptId}
-                            className="card-subtle"
+                <div className="inspector-split">
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "var(--ink)", marginBottom: 12 }}>
+                      <EyeOff size={14} /> Stays Local (Private Witness)
+                    </div>
+                    <div className="ledger-row">
+                      <span style={{ fontSize: 13, color: "var(--ink-muted)", flexShrink: 0 }}>Exact income</span>
+                      <strong className="tabular" style={{ fontSize: 13.5, textAlign: "right" }}>
+                        {fmtMoney(monthlyIncome, currencyCode)}/mo
+                      </strong>
+                    </div>
+                    <div className="ledger-row">
+                      <span style={{ fontSize: 13, color: "var(--ink-muted)", flexShrink: 0 }}>Exact balance</span>
+                      <strong className="tabular" style={{ fontSize: 13.5, textAlign: "right" }}>
+                        {fmtMoney(liquidBalance, currencyCode)}
+                      </strong>
+                    </div>
+                    <div className="ledger-row">
+                      <span style={{ fontSize: 13, color: "var(--ink-muted)", flexShrink: 0 }}>KYC seed</span>
+                      <span
+                        className="mono"
+                        style={{
+                          fontSize: 12,
+                          minWidth: 0,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          textAlign: "right",
+                        }}
+                        title={kycIdSeed}
+                      >
+                        {kycIdSeed}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="inspector-right">
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "var(--teal)", marginBottom: 12 }}>
+                      <CheckCircle2 size={14} /> Published to Midnight Ledger
+                    </div>
+                    {activeReceipt ? (
+                      <>
+                        <div className="ledger-row">
+                          <span style={{ fontSize: 13, color: "var(--ink-muted)", flexShrink: 0 }}>Verdict</span>
+                          <strong
                             style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              gap: 10,
-                              flexWrap: "wrap",
+                              fontSize: 13.5,
+                              color:
+                                activeReceipt.status === 2
+                                  ? "var(--vermilion)"
+                                  : activeIsExpired
+                                    ? "var(--ochre)"
+                                    : "var(--teal)",
                             }}
                           >
-                            <div>
-                              <strong style={{ fontSize: 13.5 }}>{rec.listingTitle}</strong>
-                              <div className="mono" style={{ fontSize: 11.5, color: "var(--muted)" }}>
-                                {rec.receiptId.slice(0, 20)}... · {rec.issuerName}
-                              </div>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <span className={`badge ${label === "QUALIFIED" ? "badge-ok" : "badge-danger"}`}>
-                                {label}
-                              </span>
-                              <button
-                                type="button"
-                                className="btn-ghost"
-                                style={{ padding: "6px 10px", fontSize: 12 }}
-                                onClick={() => {
-                                  setVerifyInput(rec.receiptId);
-                                  handleVerifyReceipt(rec.receiptId, verifyExpectedListingId);
-                                }}
-                              >
-                                Check Against Selected
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="card">
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <Building2 size={18} color="#7c5cff" />
-                  <h3 style={{ margin: 0, fontSize: 18 }}>Publish Custom Rental Listing</h3>
-                </div>
-                <div style={{ display: "grid", gap: 12 }}>
-                  <div>
-                    <label className="field-label" htmlFor="new-title">Listing Title</label>
-                    <input
-                      id="new-title"
-                      type="text"
-                      className="input-dark"
-                      value={newListingTitle}
-                      onChange={(e) => setNewListingTitle(e.target.value)}
-                    />
-                  </div>
-                  <div className="grid-3" style={{ alignItems: "end" }}>
-                    <div>
-                      <label className="field-label" htmlFor="new-loc">City</label>
-                      <input
-                        id="new-loc"
-                        type="text"
-                        className="input-dark"
-                        value={newListingLoc}
-                        onChange={(e) => setNewListingLoc(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label" htmlFor="new-mode">Mode</label>
-                      <select
-                        id="new-mode"
-                        className="input-dark"
-                        value={newListingMode}
-                        onChange={(e) => setNewListingMode(Number(e.target.value) as ListingMode)}
-                      >
-                        <option value={0}>Income + Deposit</option>
-                        <option value={1}>Runway Only</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="field-label" htmlFor="new-curr">Currency</label>
-                      <select
-                        id="new-curr"
-                        className="input-dark"
-                        value={newListingCurrency}
-                        onChange={(e) => setNewListingCurrency(Number(e.target.value) as CurrencyCode)}
-                      >
-                        <option value={840}>USD ($)</option>
-                        <option value={978}>EUR (€)</option>
-                        <option value={360}>IDR (Rp)</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid-3" style={{ alignItems: "end" }}>
-                    <div>
-                      <label className="field-label" htmlFor="new-rent">Rent / mo</label>
-                      <input
-                        id="new-rent"
-                        type="number"
-                        className="input-dark tabular"
-                        value={newListingRent}
-                        onChange={(e) => setNewListingRent(Number(e.target.value) || 0)}
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label" htmlFor="new-inc">Min Income</label>
-                      <input
-                        id="new-inc"
-                        type="number"
-                        className="input-dark tabular"
-                        disabled={newListingMode === 1}
-                        value={newListingMode === 1 ? 0 : newListingMinIncome}
-                        onChange={(e) => setNewListingMinIncome(Number(e.target.value) || 0)}
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label" htmlFor="new-bal">Min Balance</label>
-                      <input
-                        id="new-bal"
-                        type="number"
-                        className="input-dark tabular"
-                        value={newListingMinBalance}
-                        onChange={(e) => setNewListingMinBalance(Number(e.target.value) || 0)}
-                      />
-                    </div>
-                  </div>
-                  <button type="button" className="btn-primary" onClick={handleCreateListing}>
-                    <PlusCircle size={16} /> Publish Listing to Ledger
-                  </button>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* TAB 3: ATTACK & ATTESTER LAB */}
-          {activeTab === "attacks" && (
-            <section className="workspace-split reveal">
-              <div className="card">
-                <span className="badge badge-danger" style={{ marginBottom: 8 }}>
-                  Hardened Cryptographic Red-Team Suite
-                </span>
-                <h2 style={{ margin: "0 0 8px", fontSize: 21 }}>
-                  Try to Break the Hardened Compact Circuit (8 Attacks)
-                </h2>
-                <p style={{ margin: "0 0 16px", fontSize: 13.5, color: "var(--muted)", lineHeight: 1.55 }}>
-                  Tests real cryptographic attacks—including local salary re-hashing, cross-listing
-                  forwarding, unauthorized admin registration, currency spoofing, and secret-rotation
-                  replay.
-                </p>
-
-                <div className="grid-2" style={{ gap: 10 }}>
-                  {[
-                    { id: 1, title: "1. Inflate Salary & Re-Hash Locally", code: "TAMPERED_COMMITMENT" },
-                    { id: 2, title: "2. Forward $500 Pass to $2,400 Loft", code: "LISTING_MISMATCH" },
-                    { id: 3, title: "3. Self-Register Fake Bank", code: "UNAUTHORIZED_ADMIN" },
-                    { id: 4, title: "4. EUR Balance on USD Listing", code: "CURRENCY_MISMATCH" },
-                    { id: 5, title: "5. Replay via New tenantSecret", code: "REPLAY_ATTACK" },
-                    { id: 6, title: "6. Salary $1 Below 3× Rent", code: "INSUFFICIENT_INCOME" },
-                    { id: 7, title: "7. Expired Bank Statement", code: "EXPIRED_ATTESTATION" },
-                    { id: 8, title: "8. Stranger Revokes Pass", code: "UNAUTHORIZED_REVOKE" },
-                  ].map((atk) => (
-                    <button
-                      key={atk.id}
-                      type="button"
-                      className="btn-danger"
-                      style={{
-                        flexDirection: "column",
-                        alignItems: "flex-start",
-                        gap: 4,
-                        padding: "12px 14px",
-                        width: "100%",
-                        whiteSpace: "normal",
-                        textAlign: "left",
-                      }}
-                      onClick={() => runAdversarialAttack(atk.id)}
-                    >
-                      <span style={{ fontSize: 13.5, fontWeight: 700, color: "#fee2e2" }}>
-                        {atk.title}
-                      </span>
-                      <span className="mono" style={{ fontSize: 11, opacity: 0.85 }}>
-                        assert → {atk.code}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                {attackLogs.length > 0 && (
-                  <div style={{ marginTop: 18, display: "grid", gap: 8 }}>
-                    <strong style={{ fontSize: 13.5 }}>Live Rejection Log</strong>
-                    {attackLogs.map((log) => (
-                      <div
-                        key={log.id}
-                        className="card-subtle"
-                        style={{ borderColor: "rgba(239, 68, 68, 0.35)", fontSize: 12.5 }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
-                          <strong style={{ color: "#fca5a5" }}>
-                            BLOCKED · {log.actualCode}
+                            {activeReceipt.status === 2
+                              ? "REVOKED (2)"
+                              : activeIsExpired
+                                ? "EXPIRED (3)"
+                                : "QUALIFIED (1)"}
                           </strong>
-                          <span className="tabular" style={{ color: "var(--muted)" }}>
-                            {log.runLabel}
+                        </div>
+                        <div className="ledger-row">
+                          <span style={{ fontSize: 13, color: "var(--ink-muted)", flexShrink: 0 }}>Bound listing</span>
+                          <span className="mono" style={{ fontSize: 12.5, textAlign: "right" }}>{activeReceipt.listingId}</span>
+                        </div>
+                        <div className="ledger-row">
+                          <span style={{ fontSize: 13, color: "var(--ink-muted)", flexShrink: 0 }}>KYC commit</span>
+                          <span
+                            className="mono"
+                            style={{
+                              fontSize: 12,
+                              minWidth: 0,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              textAlign: "right",
+                            }}
+                          >
+                            {activeReceipt.applicantIdCommit.slice(0, 14)}...
                           </span>
                         </div>
-                        <div style={{ color: "var(--text)", marginBottom: 2 }}>{log.label}</div>
-                        <div style={{ color: "var(--muted)" }}>{log.reason}</div>
-                      </div>
-                    ))}
+                      </>
+                    ) : (
+                      <p style={{ margin: 0, fontSize: 13.5, color: "var(--ink-muted)", lineHeight: 1.55 }}>
+                        Generate a pass on the left to inspect what hits the Midnight ledger versus
+                        what stays sealed on your device.
+                      </p>
+                    )}
                   </div>
-                )}
-              </div>
-
-              <div className="card">
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <AlertTriangle size={18} color="#22d3ee" />
-                  <h3 style={{ margin: 0, fontSize: 18 }}>Admin-Gated Attester Registry</h3>
                 </div>
-                <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
-                  Protected by constructor-pinned <span className="mono">registryAdminCommit</span>.
-                  Anchored commitments on ledger:{" "}
-                  <strong className="tabular" style={{ color: "var(--text)" }}>
-                    {snapshot.anchoredAttestationCount}
-                  </strong>
-                  .
-                </p>
+              </div>
+            </div>
+          </section>
+        )}
 
-                <div style={{ display: "grid", gap: 10 }}>
-                  {snapshot.issuers.map((iss) => (
+        {/* TAB 2: LANDLORD VERIFIER (WALLETLESS OFF-CHAIN LEDGER READ) */}
+        {activeTab === "landlord" && (
+          <section className="workspace-grid">
+            <div style={{ display: "grid", gap: 20 }}>
+              <div className="sheet">
+                <div style={{ marginBottom: 18 }}>
+                  <h2 className="display-sub" style={{ marginBottom: 6 }}>
+                    Walletless Landlord Verifier
+                  </h2>
+                  <p style={{ margin: 0, fontSize: 14.5, color: "var(--ink-secondary)" }}>
+                    Reads Midnight public ledger maps off-chain with zero wallet. Verifies status,
+                    14-day expiry, and strict listing binding so cheap-room passes cannot be
+                    forwarded to luxury apartments.
+                  </p>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 14, marginBottom: 16 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <label className="field-label" htmlFor="verify-listing-select">
+                      Your Property Listing (Must Match Receipt)
+                    </label>
+                    <select
+                      id="verify-listing-select"
+                      className="input-field"
+                      value={verifyExpectedListingId}
+                      onChange={(e) => {
+                        setVerifyExpectedListingId(e.target.value);
+                        setVerifiedLookup(null);
+                      }}
+                    >
+                      {snapshot.listings.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.title} ({l.id})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <input
+                      type="text"
+                      className="input-field mono"
+                      style={{ flex: 1, minWidth: 220, fontSize: 13 }}
+                      placeholder="0x... receipt ID"
+                      aria-label="Receipt ID to verify"
+                      value={verifyInput}
+                      onChange={(e) => setVerifyInput(e.target.value)}
+                    />
+                    <button type="button" className="btn-primary" onClick={() => handleVerifyReceipt()}>
+                      Verify Pass
+                    </button>
+                  </div>
+                </div>
+
+                {verifiedLookup && (
+                  <div
+                    style={{
+                      padding: "16px 18px",
+                      borderRadius: 12,
+                      background:
+                        verifiedLookup.status === 1 ? "var(--teal-soft)" : "var(--vermilion-soft)",
+                      border: `1px solid ${
+                        verifiedLookup.status === 1 ? "var(--teal-border)" : "var(--vermilion-border)"
+                      }`,
+                    }}
+                  >
                     <div
-                      key={iss.id}
-                      className="card-subtle"
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        gap: 12,
-                        minHeight: 72,
+                        gap: 10,
+                        marginBottom: 6,
                       }}
                     >
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <strong
-                          style={{
-                            fontSize: 14,
-                            display: "block",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {iss.name}
-                        </strong>
-                        <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                          {iss.providerType} · <span className="mono">{iss.id}</span>
+                      <strong>{verifiedLookup.receipt?.listingTitle ?? "Lookup Result"}</strong>
+                      <span
+                        className={`status-tag ${
+                          verifiedLookup.status === 1 ? "status-teal" : "status-danger"
+                        }`}
+                      >
+                        {verifiedLookup.errorCode
+                          ? verifiedLookup.errorCode
+                          : verifiedLookup.status === 1
+                            ? "QUALIFIED"
+                            : verifiedLookup.status === 2
+                              ? "REVOKED"
+                              : verifiedLookup.status === 3
+                                ? "EXPIRED"
+                                : "NOT FOUND"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 13.5, color: "var(--ink-secondary)" }}>
+                      {verifiedLookup.humanReason}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="sheet">
+                <h3 className="display-sub" style={{ fontSize: 17, marginBottom: 14 }}>
+                  Recent Public Ledger Receipts ({snapshot.receipts.length})
+                </h3>
+                {snapshot.receipts.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: 14, color: "var(--ink-muted)" }}>
+                    No passes issued yet. Switch to Tenant Studio to generate a pass.
+                  </p>
+                ) : (
+                  <div>
+                    {snapshot.receipts.map((rec) => {
+                      const expired = snapshot.currentLedgerEpoch > rec.expiresAtEpoch;
+                      const label = rec.status === 2 ? "REVOKED" : expired ? "EXPIRED" : "QUALIFIED";
+                      return (
+                        <div key={rec.receiptId} className="ledger-row" style={{ flexWrap: "wrap" }}>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <strong style={{ fontSize: 14 }}>{rec.listingTitle}</strong>
+                            <div className="mono" style={{ fontSize: 12, color: "var(--ink-muted)" }}>
+                              {rec.receiptId.slice(0, 20)}... · {rec.issuerName}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span className={`status-tag ${label === "QUALIFIED" ? "status-teal" : "status-danger"}`}>
+                              {label}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn-secondary btn-sm"
+                              onClick={() => {
+                                setVerifyInput(rec.receiptId);
+                                handleVerifyReceipt(rec.receiptId, verifyExpectedListingId);
+                              }}
+                            >
+                              Check selected
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                        <span className={`badge ${iss.active ? "badge-ok" : "badge-danger"}`}>
-                          {iss.active ? "ACTIVE" : "REVOKED"}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="sheet">
+              <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 16 }}>
+                <Building2 size={18} color="var(--teal)" />
+                <h3 className="display-sub" style={{ fontSize: 19 }}>
+                  Publish Custom Rental Listing
+                </h3>
+              </div>
+
+              <div style={{ display: "grid", gap: 14 }}>
+                <div>
+                  <label className="field-label" htmlFor="new-title">
+                    Listing Title
+                  </label>
+                  <input
+                    id="new-title"
+                    type="text"
+                    className="input-field"
+                    value={newListingTitle}
+                    onChange={(e) => setNewListingTitle(e.target.value)}
+                  />
+                </div>
+                <div className="grid-3" style={{ alignItems: "end" }}>
+                  <div>
+                    <label className="field-label" htmlFor="new-loc">
+                      City
+                    </label>
+                    <input
+                      id="new-loc"
+                      type="text"
+                      className="input-field"
+                      value={newListingLoc}
+                      onChange={(e) => setNewListingLoc(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="field-label" htmlFor="new-mode">
+                      Mode
+                    </label>
+                    <select
+                      id="new-mode"
+                      className="input-field"
+                      value={newListingMode}
+                      onChange={(e) => setNewListingMode(Number(e.target.value) as ListingMode)}
+                    >
+                      <option value={0}>Income + Deposit</option>
+                      <option value={1}>Runway Only</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label" htmlFor="new-curr">
+                      Currency
+                    </label>
+                    <select
+                      id="new-curr"
+                      className="input-field"
+                      value={newListingCurrency}
+                      onChange={(e) => setNewListingCurrency(Number(e.target.value) as CurrencyCode)}
+                    >
+                      <option value={840}>USD ($)</option>
+                      <option value={978}>EUR (€)</option>
+                      <option value={360}>IDR (Rp)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid-3" style={{ alignItems: "end" }}>
+                  <div>
+                    <label className="field-label" htmlFor="new-rent">
+                      Rent / mo
+                    </label>
+                    <input
+                      id="new-rent"
+                      type="number"
+                      className="input-field tabular"
+                      value={newListingRent}
+                      onChange={(e) => setNewListingRent(Number(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <label className="field-label" htmlFor="new-inc">
+                      Min Income
+                    </label>
+                    <input
+                      id="new-inc"
+                      type="number"
+                      className="input-field tabular"
+                      disabled={newListingMode === 1}
+                      value={newListingMode === 1 ? 0 : newListingMinIncome}
+                      onChange={(e) => setNewListingMinIncome(Number(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <label className="field-label" htmlFor="new-bal">
+                      Min Balance
+                    </label>
+                    <input
+                      id="new-bal"
+                      type="number"
+                      className="input-field tabular"
+                      value={newListingMinBalance}
+                      onChange={(e) => setNewListingMinBalance(Number(e.target.value) || 0)}
+                    />
+                  </div>
+                </div>
+                <button type="button" className="btn-primary" onClick={handleCreateListing} style={{ marginTop: 4 }}>
+                  <PlusCircle size={15} /> Publish Listing to Ledger
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* TAB 3: ATTACK & ATTESTER LAB */}
+        {activeTab === "attacks" && (
+          <section className="workspace-grid">
+            <div className="sheet">
+              <div style={{ marginBottom: 18 }}>
+                <h2 className="display-sub" style={{ marginBottom: 6 }}>
+                  Red-Team Cryptographic Attack Lab (8 Attacks)
+                </h2>
+                <p style={{ margin: 0, fontSize: 14.5, color: "var(--ink-secondary)" }}>
+                  Trigger real fraud attacks in one click—including local salary re-hashing,
+                  cross-listing forwarding, unauthorized admin registration, currency spoofing, and
+                  secret-rotation replay.
+                </p>
+              </div>
+
+              <div className="grid-2" style={{ gap: 10 }}>
+                {[
+                  { id: 1, title: "1. Inflate Salary & Re-Hash Locally", code: "TAMPERED_COMMITMENT" },
+                  { id: 2, title: "2. Forward $500 Pass to $2,400 Loft", code: "LISTING_MISMATCH" },
+                  { id: 3, title: "3. Self-Register Fake Bank", code: "UNAUTHORIZED_ADMIN" },
+                  { id: 4, title: "4. EUR Balance on USD Listing", code: "CURRENCY_MISMATCH" },
+                  { id: 5, title: "5. Replay via New tenantSecret", code: "REPLAY_ATTACK" },
+                  { id: 6, title: "6. Salary $1 Below 3× Rent", code: "INSUFFICIENT_INCOME" },
+                  { id: 7, title: "7. Expired Bank Statement", code: "EXPIRED_ATTESTATION" },
+                  { id: 8, title: "8. Stranger Revokes Pass", code: "UNAUTHORIZED_REVOKE" },
+                ].map((atk) => (
+                  <button
+                    key={atk.id}
+                    type="button"
+                    className="btn-danger"
+                    style={{
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      gap: 3,
+                      padding: "12px 14px",
+                      width: "100%",
+                      whiteSpace: "normal",
+                      textAlign: "left",
+                      minHeight: 62,
+                    }}
+                    onClick={() => runAdversarialAttack(atk.id)}
+                  >
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--vermilion)" }}>
+                      {atk.title}
+                    </span>
+                    <span className="mono" style={{ fontSize: 11.5, color: "var(--ink-secondary)" }}>
+                      assert → {atk.code}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {attackLogs.length > 0 && (
+                <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--rule)" }}>
+                  <strong style={{ display: "block", fontSize: 14, marginBottom: 10 }}>
+                    Live Rejection Log
+                  </strong>
+                  {attackLogs.map((log) => (
+                    <div key={log.id} className="ledger-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                        <strong className="mono" style={{ fontSize: 12.5, color: "var(--vermilion)" }}>
+                          BLOCKED · {log.actualCode}
+                        </strong>
+                        <span className="tabular" style={{ fontSize: 12, color: "var(--ink-muted)" }}>
+                          {log.runLabel}
                         </span>
-                        <button
-                          type="button"
-                          className={iss.active ? "btn-danger" : "btn-ghost"}
-                          style={{ padding: "6px 12px", fontSize: 12, whiteSpace: "nowrap" }}
-                          onClick={() => {
-                            if (iss.active) engine.revokeIssuer(iss.id, DEFAULT_ADMIN_SECRET);
-                            else engine.reinstateIssuer(iss.id, DEFAULT_ADMIN_SECRET);
-                            syncLedger();
-                          }}
-                        >
-                          {iss.active ? "Revoke" : "Reinstate"}
-                        </button>
                       </div>
+                      <div style={{ fontSize: 13.5, fontWeight: 600 }}>{log.label}</div>
+                      <div style={{ fontSize: 13, color: "var(--ink-secondary)" }}>{log.reason}</div>
                     </div>
                   ))}
                 </div>
-              </div>
-            </section>
-          )}
-        </main>
-      </div>
+              )}
+            </div>
 
-      <nav className="mobile-nav" aria-label="Workspace roles">
-        <button
-          type="button"
-          className={`mobile-nav-btn ${activeTab === "tenant" ? "is-active" : ""}`}
-          onClick={() => setActiveTab("tenant")}
-        >
-          1. Tenant
-        </button>
-        <button
-          type="button"
-          className={`mobile-nav-btn ${activeTab === "landlord" ? "is-active" : ""}`}
-          onClick={() => setActiveTab("landlord")}
-        >
-          2. Landlord
-        </button>
-        <button
-          type="button"
-          className={`mobile-nav-btn ${activeTab === "attacks" ? "is-active" : ""}`}
-          onClick={() => setActiveTab("attacks")}
-        >
-          3. Attack Lab
-        </button>
-      </nav>
+            <div className="sheet">
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <AlertTriangle size={18} color="var(--teal)" />
+                <h3 className="display-sub" style={{ fontSize: 19 }}>
+                  Admin-Gated Attester Registry
+                </h3>
+              </div>
+              <p style={{ margin: "0 0 18px", fontSize: 14, color: "var(--ink-secondary)" }}>
+                Protected by constructor-pinned <span className="mono">registryAdminCommit</span>.
+                Anchored commitments on ledger:{" "}
+                <strong className="tabular" style={{ color: "var(--ink)" }}>
+                  {snapshot.anchoredAttestationCount}
+                </strong>
+                .
+              </p>
+
+              <div>
+                {snapshot.issuers.map((iss) => (
+                  <div key={iss.id} className="ledger-row">
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <strong
+                        style={{
+                          fontSize: 14.5,
+                          display: "block",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {iss.name}
+                      </strong>
+                      <div style={{ fontSize: 12.5, color: "var(--ink-muted)" }}>
+                        {iss.providerType} · <span className="mono">{iss.id}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <span className={`status-tag ${iss.active ? "status-teal" : "status-danger"}`}>
+                        {iss.active ? "Active" : "Revoked"}
+                      </span>
+                      <button
+                        type="button"
+                        className={iss.active ? "btn-danger btn-sm" : "btn-secondary btn-sm"}
+                        onClick={() => {
+                          if (iss.active) engine.revokeIssuer(iss.id, DEFAULT_ADMIN_SECRET);
+                          else engine.reinstateIssuer(iss.id, DEFAULT_ADMIN_SECRET);
+                          syncLedger();
+                        }}
+                      >
+                        {iss.active ? "Revoke" : "Reinstate"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+      </main>
 
       {toast && (
         <div
@@ -1386,20 +1465,43 @@ export default function LeaseProofWorkspace() {
           role="status"
           style={{
             borderColor:
-              toast.tone === "ok" ? "rgba(16, 185, 129, 0.45)" : "rgba(239, 68, 68, 0.45)",
+              toast.tone === "ok" ? "rgba(94, 234, 212, 0.45)" : "rgba(248, 113, 113, 0.5)",
           }}
         >
-          <strong
-            style={{
-              display: "block",
-              fontSize: 13.5,
-              color: toast.tone === "ok" ? "#34d399" : "#f87171",
-              marginBottom: 3,
-            }}
-          >
-            {toast.title}
-          </strong>
-          <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{toast.detail}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <div>
+              <strong
+                style={{
+                  display: "block",
+                  fontSize: 13.5,
+                  color: toast.tone === "ok" ? "#5eead4" : "#fca5a5",
+                  marginBottom: 3,
+                }}
+              >
+                {toast.title}
+              </strong>
+              <span style={{ fontSize: 12.5, color: "var(--bone-muted)", lineHeight: 1.45, display: "block" }}>
+                {toast.detail}
+              </span>
+            </div>
+            <button
+              type="button"
+              aria-label="Dismiss notification"
+              onClick={() => setToast(null)}
+              style={{
+                background: "transparent",
+                border: 0,
+                color: "var(--bone-muted)",
+                cursor: "pointer",
+                padding: "2px 4px",
+                fontSize: 16,
+                lineHeight: 1,
+                flexShrink: 0,
+              }}
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
     </>
